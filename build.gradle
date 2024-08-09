@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '8.3.0'
+}
+
+group = 'me.z7087.name'
+version = '1.0-SNAPSHOT'
+
+targetCompatibility = '1.6'
+sourceCompatibility = '1.6'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.ow2.asm:asm:9.7'
+
+    compileOnly project(":classgeneratorcompileonly")
+}
+
+tasks.create(name: "copyClasses", type: Copy) {
+    into 'build/classes/java/main/'
+    from 'generatedclasses/'
+}
+
+tasks.withType(JavaCompile) {
+    dependsOn(tasks.copyClasses)
+}
+
+shadowJar {
+    minimize()
+    relocate("org.objectweb.asm", "me.z7087.name.libs.org.objectweb.asm")
+}

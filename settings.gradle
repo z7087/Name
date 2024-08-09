@@ -1,0 +1,4 @@
+rootProject.name = 'Name'
+include 'classgenerator'
+include 'classgeneratorcompileonly'
+
