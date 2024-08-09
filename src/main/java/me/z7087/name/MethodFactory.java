@@ -119,12 +119,11 @@ public class MethodFactory extends AbstractClassGenerator {
                 mvInvoke.visitVarInsn(Opcodes.ALOAD, 1);
                 mvInvoke.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
             }
-            if (parameterTypes.length > 1) {
-                mvInvoke.visitVarInsn(Opcodes.ALOAD, 2);
+            if (parameterTypes.length > 0) {
                 int count = 0;
                 for (Class<?> paramType : parameterTypes) {
                     assert paramType != void.class;
-                    mvInvoke.visitInsn(Opcodes.DUP);
+                    mvInvoke.visitVarInsn(Opcodes.ALOAD, 2);
                     if (count <= 32767) {
                         if (count <= 127) {
                             switch (count) {
