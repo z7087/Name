@@ -172,13 +172,11 @@ public class MethodFactory extends AbstractClassGenerator {
                 mvInvoke.visitMethodInsn(Opcodes.INVOKEVIRTUAL, internalize(ownerClass.getName()), name, descriptor, false);
             }
             if (returnType == void.class) {
-                mvInvoke.visitInsn(Opcodes.RETURN);
+                mvInvoke.visitInsn(Opcodes.ACONST_NULL);
             } else if (returnType.isPrimitive()) {
                 boxingOnStack(mvInvoke, returnType);
-                mvInvoke.visitInsn(Opcodes.ARETURN);
-            } else {
-                mvInvoke.visitInsn(Opcodes.ARETURN);
             }
+            mvInvoke.visitInsn(Opcodes.ARETURN);
             writeMethodTail(mvInvoke);
         }
         if (canUseInvokeExact) {
