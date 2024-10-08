@@ -11,7 +11,10 @@ public class Example {
     public static void main(String[] args) throws Throwable {
         System.out.println("main ok");
         long t = System.nanoTime();
-        AccessorClassGenerator.getInstance().getGeneratedDoorClass();
+        {
+            Class<?> doorClass = AccessorClassGenerator.getInstance().getGeneratedDoorClass();
+            assert doorClass != null;
+        }
         long t1 = System.nanoTime();
         System.out.println("door class ok: " + (t1-t) / 1000000.0 + "ms");
         t = System.nanoTime();

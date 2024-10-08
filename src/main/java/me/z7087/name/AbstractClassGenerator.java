@@ -23,11 +23,28 @@ abstract class AbstractClassGenerator {
         return cw;
     }
 
+    protected static ClassWriter writeClassHead(String className, String signature, String superName, String[] interfaces, int modifiers, int constructorModifiers) {
+        final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+        cw.visit(V1_6, modifiers, className, signature, superName, interfaces);
+        writeConstructor(cw, superName, constructorModifiers);
+        return cw;
+    }
+
     protected static void writeConstructor(ClassWriter cw, String superName) {
         final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
         mv.visitInsn(RETURN);
+        mv.visitMaxs(1, 1);
+        mv.visitEnd();
+    }
+
+    protected static void writeConstructor(ClassWriter cw, String superName, int modifiers) {
+        final MethodVisitor mv = cw.visitMethod(modifiers, "<init>", "()V", null, null);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(1, 1);
         mv.visitEnd();
     }
 
@@ -37,7 +54,14 @@ abstract class AbstractClassGenerator {
         return mv;
     }
 
+    protected static MethodVisitor writeMethodHead(ClassWriter cw, String name, String descriptor, int modifiers) {
+        final MethodVisitor mv = cw.visitMethod(modifiers, name, descriptor, null, null);
+        mv.visitCode();
+        return mv;
+    }
+
     protected static void writeMethodTail(MethodVisitor mv) {
+        mv.visitMaxs(-1, -1);
         mv.visitEnd();
     }
 
@@ -89,7 +113,7 @@ abstract class AbstractClassGenerator {
     }
 
     protected static String getClassDescName(Class<?> clazz) {
-        if (clazz.isPrimitive()) {
+        if (clazz.isPrimitive() || clazz.isArray()) {
             return getClassName(clazz);
         }
         return "L" + getClassName(clazz) + ";";

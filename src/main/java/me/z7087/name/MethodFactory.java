@@ -8,7 +8,6 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.Arrays;
 
 
 // warning: you should not use this at runtime now as it uses 60s to generate a class
@@ -21,6 +20,8 @@ public class MethodFactory extends AbstractClassGenerator {
                      boolean forceSpecial, boolean checkExist) throws NoSuchMethodException {
         if (ownerClass.isPrimitive())
             throw new IllegalArgumentException("Owner class cannot be primitive");
+        if (ownerClass.isArray())
+            throw new IllegalArgumentException("Owner class cannot be array");
         if (checkExist) {
             foundMethod:
             {
@@ -45,35 +46,23 @@ public class MethodFactory extends AbstractClassGenerator {
             }
         }
         final Class<?> superClass = AccessorClassGenerator.getInstance().getGeneratedDoorClass();
-        {
-            final int length;
-            if (parameterTypes == null || (length = parameterTypes.length) == 0) {
-                parameterTypes = EMPTY_CLASS_ARRAY;
-            } else {
-                parameterTypes = Arrays.copyOf(parameterTypes, length);
-            }
+        if (parameterTypes == null || parameterTypes.length == 0) {
+            parameterTypes = EMPTY_CLASS_ARRAY;
+        } else {
+            parameterTypes = parameterTypes.clone();
         }
         final int id = getId();
         final String className;
         {
-            String generatedClassesPath = internalize(Here.class.getName());
-            generatedClassesPath = generatedClassesPath.substring(0,
-                    generatedClassesPath.lastIndexOf(Here.class.getSimpleName())
+            String _generatedClassesPath = internalize(Here.class.getName());
+            _generatedClassesPath = _generatedClassesPath.substring(0,
+                    _generatedClassesPath.lastIndexOf(Here.class.getSimpleName())
             );
-            className = generatedClassesPath + "GeneratedClass" + id;
+            className = _generatedClassesPath + "GeneratedClass" + id;
         }
         final String superClassName = internalize(superClass.getName());
         final String[] interfaces = new String[1];
         final boolean canUseInvokeExact = parameterTypes.length <= 4;
-        final int objectParamCount;
-        {
-            int count = 0;
-            for (Class<?> p : parameterTypes) {
-                if (!p.isPrimitive())
-                    count++;
-            }
-            objectParamCount = count;
-        }
         {
             String apiPath = internalize(BaseMethodAccessor.class.getName());
             apiPath = apiPath.substring(0,
@@ -163,10 +152,10 @@ public class MethodFactory extends AbstractClassGenerator {
                 }
             }
             if (isStatic(modifiers)) {
-                mvInvoke.visitMethodInsn(Opcodes.INVOKESTATIC, internalize(ownerClass.getName()), name, descriptor, false);
+                mvInvoke.visitMethodInsn(Opcodes.INVOKESTATIC, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
             } else if (forceSpecial || isPrivate(modifiers)) {
-                mvInvoke.visitMethodInsn(Opcodes.INVOKESPECIAL, internalize(ownerClass.getName()), name, descriptor, !isPrivate(modifiers) && isInterface(modifiers));
-            } else if (isInterface(modifiers)) {
+                mvInvoke.visitMethodInsn(Opcodes.INVOKESPECIAL, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
+            } else if (isInterface(ownerClass.getModifiers())) {
                 mvInvoke.visitMethodInsn(Opcodes.INVOKEINTERFACE, internalize(ownerClass.getName()), name, descriptor, true);
             } else {
                 mvInvoke.visitMethodInsn(Opcodes.INVOKEVIRTUAL, internalize(ownerClass.getName()), name, descriptor, false);
@@ -226,10 +215,10 @@ public class MethodFactory extends AbstractClassGenerator {
                 }
             }
             if (isStatic(modifiers)) {
-                mvInvokeExact.visitMethodInsn(Opcodes.INVOKESTATIC, internalize(ownerClass.getName()), name, descriptor, false);
+                mvInvokeExact.visitMethodInsn(Opcodes.INVOKESTATIC, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
             } else if (forceSpecial || isPrivate(modifiers)) {
-                mvInvokeExact.visitMethodInsn(Opcodes.INVOKESPECIAL, internalize(ownerClass.getName()), name, descriptor, !isPrivate(modifiers) && isInterface(modifiers));
-            } else if (isInterface(modifiers)) {
+                mvInvokeExact.visitMethodInsn(Opcodes.INVOKESPECIAL, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
+            } else if (isInterface(ownerClass.getModifiers())) {
                 mvInvokeExact.visitMethodInsn(Opcodes.INVOKEINTERFACE, internalize(ownerClass.getName()), name, descriptor, true);
             } else {
                 mvInvokeExact.visitMethodInsn(Opcodes.INVOKEVIRTUAL, internalize(ownerClass.getName()), name, descriptor, false);

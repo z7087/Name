@@ -37,6 +37,18 @@ final class UnsafeClassDefiner {
             }
         }
     }
+
+    public static Class<?> defineHidden(Class<?> hostClass, byte[] classByteArray) {
+        if (JavaVersion.getInstance().getVersion() <= 16) {
+            try {
+                // defineAnonymousClass method in sun.mise.Unsafe still exists
+                return AccessorClassGenerator.getInstance().getGeneratedAccessorInstance().defineAnonymousClass(hostClass, classByteArray, null);
+            } catch (NoSuchMethodError e) {
+                // or not?
+            }
+        }
+        return AccessorClassGenerator.getInstance().getGeneratedAccessorInstance().defineHiddenClass(hostClass, classByteArray);
+    }
     private static final class UnsafeClassDefinerJ11 {
         public static Class<?> defineJ11(String className, byte[] classByteArray,
                                          ClassLoader loader,
@@ -57,7 +69,7 @@ final class UnsafeClassDefiner {
             ReflectionUtil.theUnsafe.putObject(UnsafeClassDefinerJ11.class, fieldModuleOffset, ReflectionUtil.theUnsafe.getObject(Class.class, fieldModuleOffset));
             try {
                 java.lang.reflect.Method defineClassMethod = theInternalUnsafe.getClass().getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class, ClassLoader.class, ProtectionDomain.class);
-                defineClassMethod.setAccessible(true);
+                //defineClassMethod.setAccessible(true);
                 return (Class<?>) defineClassMethod.invoke(theInternalUnsafe, className, classByteArray, 0, classByteArray.length, loader, protectionDomain);
             } finally {
                 ReflectionUtil.theUnsafe.putObject(UnsafeClassDefinerJ11.class, fieldModuleOffset, originModule);

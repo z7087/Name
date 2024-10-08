@@ -167,7 +167,7 @@ public class FieldFactory extends AbstractClassGenerator {
         }
         final byte[] classByteArray = writeClassTail(cw);
         try {
-            final Class<?> outClass = ReflectionUtil.theUnsafe.defineClass(className, classByteArray, 0, classByteArray.length, Here.class.getClassLoader(), null);
+            final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, Here.class.getClassLoader(), null);
             return (FieldAccessor<T>) outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null);
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);

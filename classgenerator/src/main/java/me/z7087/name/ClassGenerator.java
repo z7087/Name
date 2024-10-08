@@ -1,11 +1,11 @@
 package me.z7087.name;
 
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.net.URI;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -297,10 +297,366 @@ public class ClassGenerator {
         writeToFile(className, cw.toByteArray());
     }
 
+    private static void generateAccessImpl() {
+        final String path = "me/z7087/name/generatedclasses/";
+        final String className = path + "AccessorImpl";
+        final ClassWriter cw = writeClassHead(className,
+                null,
+                path + "Door",
+                new String[]{path + "Accessor"},
+                0 // package-private
+        );
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getClassLoader", "(Ljava/lang/Class;)Ljava/lang/ClassLoader;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getClassLoader0", "()Ljava/lang/ClassLoader;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            /*
+            this = clazz.getProtectionDomain0();
+            if (this != null)
+                return this;
+            (this = new Permissions()).add(SecurityConstants.ALL_PERMISSION);
+            clazz = new ProtectionDomain; // <init> not here
+            clazz.<init>(null, this);
+            return clazz;
+             */
+            final MethodVisitor mv = writeMethodHead(cw, "getProtectionDomain", "(Ljava/lang/Class;)Ljava/security/ProtectionDomain;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getProtectionDomain0", "()Ljava/security/ProtectionDomain;", false);
+            mv.visitVarInsn(ASTORE, 0);
+            {
+                Label replaceNullWithAllPerm = new Label();
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitJumpInsn(IFNULL, replaceNullWithAllPerm);
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitInsn(ARETURN);
+                mv.visitLabel(replaceNullWithAllPerm);
+            }
+            mv.visitTypeInsn(NEW, "java/security/Permissions");
+            mv.visitInsn(DUP);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/security/Permissions", "<init>", "()V", false);
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ASTORE, 0);
+            mv.visitFieldInsn(GETSTATIC, "sun/security/util/SecurityConstants", "ALL_PERMISSION", "Ljava/security/AllPermission;");
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/security/Permissions", "add", "(Ljava/security/Permission;)V", false);
+            mv.visitTypeInsn(NEW, "java/security/ProtectionDomain");
+            mv.visitVarInsn(ASTORE, 1);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitInsn(ACONST_NULL);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/security/ProtectionDomain", "<init>", "(Ljava/security/CodeSource;Ljava/security/PermissionCollection;)V", false);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getProtectionDomainOrNull", "(Ljava/lang/Class;)Ljava/security/ProtectionDomain;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getProtectionDomain0", "()Ljava/security/ProtectionDomain;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getLookupDefault", "()Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/MethodHandles$Lookup", "<init>", "(Ljava/lang/Class;)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getLookupDefault", "(Ljava/lang/Class;)Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/MethodHandles$Lookup", "<init>", "(Ljava/lang/Class;)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getLookupTrustedJ14", "()Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+            mv.visitInsn(ICONST_M1);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/MethodHandles$Lookup", "<init>", "(Ljava/lang/Class;I)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getLookupTrustedJ14", "(Ljava/lang/Class;)Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitInsn(ICONST_M1);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/MethodHandles$Lookup", "<init>", "(Ljava/lang/Class;I)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getLookupTrustedJ15", "()Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+            mv.visitInsn(ACONST_NULL);
+            mv.visitInsn(ICONST_M1);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/MethodHandles$Lookup", "<init>", "(Ljava/lang/Class;Ljava/lang/Class;I)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getLookupTrustedJ15", "(Ljava/lang/Class;)Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitInsn(DUP);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitInsn(ACONST_NULL);
+            mv.visitInsn(ICONST_M1);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/invoke/MethodHandles$Lookup", "<init>", "(Ljava/lang/Class;Ljava/lang/Class;I)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getImplLookup", "()Ljava/lang/Object;");
+            mv.visitFieldInsn(GETSTATIC, "java/lang/invoke/MethodHandles$Lookup", "IMPL_LOOKUP", "Ljava/lang/invoke/MethodHandles$Lookup;");
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC | ACC_FINAL,
+                    "defineClass",
+                    "(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;",
+                    null,
+                    new String[]{"java/lang/ClassFormatError"});
+            mv.visitCode();
+            mv.visitVarInsn(ALOAD, 5);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ILOAD, 3);
+            mv.visitVarInsn(ILOAD, 4);
+            mv.visitVarInsn(ALOAD, 6);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/ClassLoader", "defineClass", "(Ljava/lang/String;[BIILjava/security/ProtectionDomain;)Ljava/lang/Class;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "defineClassUnsafeJ8", "(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;");
+            mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ILOAD, 3);
+            mv.visitVarInsn(ILOAD, 4);
+            mv.visitVarInsn(ALOAD, 5);
+            mv.visitVarInsn(ALOAD, 6);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "defineClass", "(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "defineClassUnsafeJ9", "(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;");
+            mv.visitFieldInsn(GETSTATIC, "jdk/internal/misc/Unsafe", "theUnsafe", "Ljdk/internal/misc/Unsafe;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ILOAD, 3);
+            mv.visitVarInsn(ILOAD, 4);
+            mv.visitVarInsn(ALOAD, 5);
+            mv.visitVarInsn(ALOAD, 6);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "jdk/internal/misc/Unsafe", "defineClass", "(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/ProtectionDomain;)Ljava/lang/Class;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "defineAnonymousClass", "(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;");
+            mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitVarInsn(ALOAD, 3);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "defineAnonymousClass", "(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "defineHiddenClass", "(Ljava/lang/Class;[B)Ljava/lang/Class;");
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(INVOKEINTERFACE, path + "Accessor", "getLookupTrustedJ15", "(Ljava/lang/Class;)Ljava/lang/Object;", false);
+            mv.visitTypeInsn(CHECKCAST, "java/lang/invoke/MethodHandles$Lookup");
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitTypeInsn(NEW, "java/util/HashSet");
+            mv.visitInsn(DUP);
+            mv.visitInsn(ICONST_0);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/util/HashSet", "<init>", "(I)V", false);
+            mv.visitInsn(ICONST_0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "makeHiddenClassDefiner", "([BLjava/util/Set;Z)Ljava/lang/invoke/MethodHandles$Lookup$ClassDefiner;", false);
+            mv.visitInsn(ICONST_0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup$ClassDefiner", "defineClass", "(Z)Ljava/lang/Class;", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        writeToFile(className, writeClassTail(cw));
+    }
+
+
+    private static void generateTest() {
+        generateTest(7);
+    }
+
+    private static void generateTest(int f) {
+        // jvm use a different logic for verifying 1.4- classes' field names
+        // that allows us to create classes like "/a", cls.getName() returns ".a"
+        // tested on j8 j17 j21 j22
+        if ((f & 1) == 1) {
+            {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                final String className = "a";
+                cw.visit(V1_4, ACC_PUBLIC, "/" + className, null, "java/lang/Object", null);
+                writeConstructor(cw, "java/lang/Object");
+                {
+                    final MethodVisitor mv = writeMethodHead(cw, "main", "()Ljava/lang/String;");
+                    mv.visitLdcInsn("hello, world!");
+                    mv.visitInsn(ARETURN);
+                    writeMethodTail(mv);
+                }
+                writeToFile(className, writeClassTail(cw));
+            }
+            {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                final String className = "main";
+                cw.visit(V1_4, ACC_PUBLIC, className, null, "java/lang/Object", null);
+                writeConstructor(cw, "java/lang/Object");
+                {
+                    final MethodVisitor mv = writeMethodHeadStatic(cw, "main", "([Ljava/lang/String;)V");
+                    mv.visitTypeInsn(NEW, "/a");
+                    mv.visitInsn(DUP);
+                    mv.visitMethodInsn(INVOKESPECIAL, "/a", "<init>", "()V", false);
+                    mv.visitVarInsn(ASTORE, 2);
+                    mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+                    mv.visitVarInsn(ASTORE, 1);
+                    mv.visitVarInsn(ALOAD, 1);
+                    mv.visitVarInsn(ALOAD, 2);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "/a", "main", "()Ljava/lang/String;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+                    mv.visitVarInsn(ALOAD, 1);
+                    mv.visitVarInsn(ALOAD, 2);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getName", "()Ljava/lang/String;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+                    mv.visitInsn(RETURN);
+                    writeMethodTail(mv);
+                }
+                writeToFile(className, writeClassTail(cw));
+            }
+        }
+        // still 1.4 classes
+        // allows us to create classes like "a/", cls.getName() returns "a."
+        // tested on j8 j17 j21, and failed on j21
+        // you can use it on j18-
+        if ((f & 2) == 2) {
+            {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                final String className = "a/";
+                cw.visit(V1_4, ACC_PUBLIC, className, null, "java/lang/Object", null);
+                writeConstructor(cw, "java/lang/Object");
+                {
+                    final MethodVisitor mv = writeMethodHead(cw, "main", "()Ljava/lang/String;");
+                    mv.visitLdcInsn("hello, world!");
+                    mv.visitInsn(ARETURN);
+                    writeMethodTail(mv);
+                }
+                writeToFile(className, writeClassTail(cw));
+            }
+            {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                final String className = "main2";
+                cw.visit(V1_4, ACC_PUBLIC, className, null, "java/lang/Object", null);
+                writeConstructor(cw, "java/lang/Object");
+                {
+                    final MethodVisitor mv = writeMethodHeadStatic(cw, "main", "([Ljava/lang/String;)V");
+                    mv.visitTypeInsn(NEW, "a/");
+                    mv.visitInsn(DUP);
+                    mv.visitMethodInsn(INVOKESPECIAL, "a/", "<init>", "()V", false);
+                    mv.visitVarInsn(ASTORE, 2);
+                    mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+                    mv.visitVarInsn(ASTORE, 1);
+                    mv.visitVarInsn(ALOAD, 1);
+                    mv.visitVarInsn(ALOAD, 2);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "a/", "main", "()Ljava/lang/String;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+                    mv.visitVarInsn(ALOAD, 1);
+                    mv.visitVarInsn(ALOAD, 2);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getName", "()Ljava/lang/String;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+                    mv.visitInsn(RETURN);
+                    writeMethodTail(mv);
+                }
+                writeToFile(className, writeClassTail(cw));
+            }
+        }
+        // and you can merge them
+        // create a class and name it "/", cls.getName() returns "."
+        // super fun :D
+        if ((f & 4) == 4) {
+            {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                final String className = "/";
+                cw.visit(V1_4, ACC_PUBLIC, className, null, "java/lang/Object", null);
+                writeConstructor(cw, "java/lang/Object");
+                {
+                    final MethodVisitor mv = writeMethodHead(cw, "main", "()Ljava/lang/String;");
+                    mv.visitLdcInsn("hello, world!");
+                    mv.visitInsn(ARETURN);
+                    writeMethodTail(mv);
+                }
+                writeToFile("", writeClassTail(cw));
+            }
+            {
+                final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                final String className = "main3";
+                cw.visit(V1_4, ACC_PUBLIC, className, null, "java/lang/Object", null);
+                writeConstructor(cw, "java/lang/Object");
+                {
+                    final MethodVisitor mv = writeMethodHeadStatic(cw, "main", "([Ljava/lang/String;)V");
+                    mv.visitTypeInsn(NEW, "/");
+                    mv.visitInsn(DUP);
+                    mv.visitMethodInsn(INVOKESPECIAL, "/", "<init>", "()V", false);
+                    mv.visitVarInsn(ASTORE, 2);
+                    mv.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+                    mv.visitVarInsn(ASTORE, 1);
+                    mv.visitVarInsn(ALOAD, 1);
+                    mv.visitVarInsn(ALOAD, 2);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "/", "main", "()Ljava/lang/String;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+                    mv.visitVarInsn(ALOAD, 1);
+                    mv.visitVarInsn(ALOAD, 2);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "getClass", "()Ljava/lang/Class;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getName", "()Ljava/lang/String;", false);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+                    mv.visitInsn(RETURN);
+                    writeMethodTail(mv);
+                }
+                writeToFile(className, writeClassTail(cw));
+            }
+        }
+    }
+
     public static void main(String[] args) {
         mpc = 4;
         //String[] base = new String[1];
         //base[0] = "me/z7087/name/api/BaseMethodAccessor";
+        generateAccessImpl();
+        {
+            final boolean forTest = false;
+            //noinspection ConstantValue
+            if (forTest)
+                generateTest();
+        }
         String[] base = null;
         for (int i = 0; i <= mpc; ++i) {
             generateBaseClass(i, base);
@@ -310,5 +666,43 @@ public class ClassGenerator {
         }
         generateAll();
         generateMethodAccessorCast();
+    }
+
+    protected static ClassWriter writeClassHead(String className, String signature, String superName, String[] interfaces, int modifiers) {
+        final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+        cw.visit(V1_6, modifiers, className, signature, superName, interfaces);
+        writeConstructor(cw, superName);
+        return cw;
+    }
+
+    protected static void writeConstructor(ClassWriter cw, String superName) {
+        final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(1, 1);
+        mv.visitEnd();
+    }
+
+    protected static MethodVisitor writeMethodHead(ClassWriter cw, String name, String descriptor) {
+        final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC | ACC_FINAL, name, descriptor, null, null);
+        mv.visitCode();
+        return mv;
+    }
+
+    protected static MethodVisitor writeMethodHeadStatic(ClassWriter cw, String name, String descriptor) {
+        final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC | ACC_FINAL | ACC_STATIC, name, descriptor, null, null);
+        mv.visitCode();
+        return mv;
+    }
+
+    protected static void writeMethodTail(MethodVisitor mv) {
+        mv.visitMaxs(-1, -1);
+        mv.visitEnd();
+    }
+
+    protected static byte[] writeClassTail(ClassWriter cw) {
+        cw.visitEnd();
+        return cw.toByteArray();
     }
 }
