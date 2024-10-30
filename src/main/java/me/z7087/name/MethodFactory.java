@@ -1,6 +1,5 @@
 package me.z7087.name;
 
-import me.z7087.name.api.BaseMethodAccessor;
 import me.z7087.name.api.MethodAccessor;
 import me.z7087.name.generatedclasses.Here;
 import org.objectweb.asm.ClassWriter;
@@ -9,248 +8,165 @@ import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.InvocationTargetException;
 
+public final class MethodFactory extends AbstractClassGenerator {
+    private MethodFactory() {}
 
-// warning: you should not use this at runtime now as it uses 60s to generate a class
-// BaseMethodAccessorWithObjectParamXXX classes are too big, you should make your own implementation
-public class MethodFactory extends AbstractClassGenerator {
-    private static final Class<?>[] EMPTY_CLASS_ARRAY = new Class[0];
-    protected MethodFactory() {}
-    private static <T> MethodAccessor<T> createMethod(String name, Class<T> ownerClass, int modifiers,
-                     Class<?>[] parameterTypes, Class<?> returnType,
-                     boolean forceSpecial, boolean checkExist) throws NoSuchMethodException {
-        if (ownerClass.isPrimitive())
-            throw new IllegalArgumentException("Owner class cannot be primitive");
-        if (ownerClass.isArray())
-            throw new IllegalArgumentException("Owner class cannot be array");
-        if (checkExist) {
-            foundMethod:
-            {
-                final int parameterTypesLength = parameterTypes.length;
-                for (java.lang.reflect.Method reflectMethod : ownerClass.getDeclaredMethods()) {
-                    if (reflectMethod.getName().equals(name)
-                            && reflectMethod.getModifiers() == modifiers
-                            && reflectMethod.getReturnType() == returnType
-                    ) {
-                        final Class<?>[] methodParameterTypes = reflectMethod.getParameterTypes();
-                        checkParamTypes:
-                        if (methodParameterTypes.length == parameterTypesLength) {
-                            for (int i = 0; i < parameterTypesLength; ++i) {
-                                if (methodParameterTypes[i] != parameterTypes[i])
-                                    break checkParamTypes;
-                            }
-                            break foundMethod;
-                        }
-                    }
-                }
-                throw new NoSuchMethodException(name);
+    private static void verify(Class<?> interfaceClass,
+                               MethodDesc targetMethod,
+                               MethodDesc interfaceMethod,
+                               boolean isStatic) {
+        if (interfaceClass.isPrimitive())
+            throwIllegalArgumentException("interfaceClass cannot be primitive");
+        if (interfaceClass.isArray())
+            throw new IllegalArgumentException("interfaceClass cannot be array");
+
+        if (!getClassName(interfaceClass).equals(interfaceMethod.getOwnerClass()))
+            throwIllegalArgumentException("interfaceClass is not the owner of interfaceMethod");
+
+        if (!canCheckCastOrBox(targetMethod.getReturnType(), interfaceMethod.getReturnType()))
+            throwIllegalArgumentException("The return value type of interfaceMethod is not compatible with the return value type of targetMethod: \n" + interfaceMethod.getReturnType() + "\n" + targetMethod.getReturnType());
+
+        final int offsetIndex = interfaceMethod.getParamTypesRaw().length - targetMethod.getParamTypesRaw().length;
+        switch (offsetIndex) {
+            case 0:
+                break;
+            case 1:
+                if (isStatic)
+                    // unused arg, but continue
+                    break;
+            default:
+                throwIllegalArgumentException("The number of parameters for interfaceMethod is not compatible with targetMethod's: " + interfaceMethod.getParamTypesRaw().length + ", " + targetMethod.getParamTypesRaw().length);
+        }
+        if (offsetIndex == 1) {
+            if (isParamTypePrimitive(interfaceMethod.getParamTypesRaw()[0])) {
+                throwIllegalArgumentException("interfaceMethod parameter 0 cannot be primitive: " + interfaceMethod.getParamTypesRaw()[0]);
             }
+        }
+        for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
+            if (!canCheckCastOrBox(interfaceMethod.getParamTypesRaw()[i + offsetIndex], targetMethod.getParamTypesRaw()[i]))
+                throwIllegalArgumentException("The type of interfaceMethod parameter" + (i + offsetIndex) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethod.getParamTypesRaw()[i + offsetIndex] + "\n" + targetMethod.getParamTypesRaw()[i]);
+        }
+    }
+
+    private static <T> T createMethod(ClassLoader loader,
+                                      Class<T> interfaceClass,
+                                      MethodDesc targetMethod,
+                                      MethodDesc interfaceMethod,
+                                      boolean isStatic,
+                                      boolean targetClassIsInterface,
+                                      boolean targetMethodIsInterface,
+                                      boolean invokeSpecial,
+                                      boolean checkExist
+    ) throws NoSuchMethodException {
+        if (targetMethodIsInterface && !targetClassIsInterface)
+            throwIllegalArgumentException("targetMethodIsInterface cannot be true if targetClassIsInterface is false");
+        verify(
+                interfaceClass,
+                targetMethod,
+                interfaceMethod,
+                isStatic
+        );
+
+        if (checkExist) {
+            findMethod(loader, targetMethod);
+            findMethod(loader, interfaceMethod);
         }
         final Class<?> superClass = AccessorClassGenerator.getInstance().getGeneratedDoorClass();
-        if (parameterTypes == null || parameterTypes.length == 0) {
-            parameterTypes = EMPTY_CLASS_ARRAY;
-        } else {
-            parameterTypes = parameterTypes.clone();
-        }
-        final int id = getId();
-        final String className;
-        {
-            String _generatedClassesPath = internalize(Here.class.getName());
-            _generatedClassesPath = _generatedClassesPath.substring(0,
-                    _generatedClassesPath.lastIndexOf(Here.class.getSimpleName())
-            );
-            className = _generatedClassesPath + "GeneratedClass" + id;
-        }
-        final String superClassName = internalize(superClass.getName());
+        final String className = Here.PATH + "GeneratedClass" + getId();
+        final String superClassName = getClassName(superClass);
         final String[] interfaces = new String[1];
-        final boolean canUseInvokeExact = parameterTypes.length <= 4;
-        {
-            String apiPath = internalize(BaseMethodAccessor.class.getName());
-            apiPath = apiPath.substring(0,
-                    apiPath.lastIndexOf(BaseMethodAccessor.class.getSimpleName())
-            );
-            interfaces[0] = apiPath + "MethodAccessor";
-        }
+        interfaces[0] = interfaceMethod.getOwnerClass();
         final ClassWriter cw = writeClassHead(className, null, superClassName, interfaces);
-        // invoke():
-        //   for (IFDZLa/b/SomethingExtendsObject;)S:
-        //     return Short.valueOf(object.XXX(args[0].intValue(), args[1].floatValue(), args[2].doubleValue(), args[3].booleanValue(), (a.b.SomethingExtendsObject) args[4]));
-        //   for ()V:
-        //     object.XXX();
-        //     return null;
-        //   for (IIIII)I:
-        //     return Integer.valueOf(object.XXX(args[0].intValue(), args[1].intValue(), args[2].intValue(), args[3].intValue(), args[4].intValue()));
-        //   for static ()I:
-        //     return Integer.valueOf(objectClass.XXX());
-        // invokeForXXX():
-        //   for (IIIII)V:
-        //     throw new AbstractMethodError(); // undefined method
-        //   for (La/b/SomethingExtendsObject;)La/b/SomethingExtendsObject;:
-        //     return (a.b.SomethingExtendsObject) object.XXX((a.b.SomethingExtendsObject) arg0);
-        //   for static ()I:
-        //     return objectClass.XXX();
-        //   unused arg in static calls, should we make invokeStaticForXXX?
-        final String descriptor;
         {
-            final StringBuilder descBuilder = new StringBuilder("(");
-            for (Class<?> paramType : parameterTypes) {
-                if (paramType == void.class)
-                    throw new IllegalArgumentException("Found void in parameterTypes");
-                descBuilder.append(getClassDescName(paramType));
-            }
-            descBuilder.append(')');
-            descBuilder.append(getClassDescName(returnType));
-            descriptor = descBuilder.toString();
-        }
-
-        {
-            final MethodVisitor mvInvoke = writeMethodHead(cw, "invoke", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-            if (!isStatic(modifiers)) {
+            final MethodVisitor mvInvoke = writeMethodHead(cw, interfaceMethod.getName(), "(" + interfaceMethod.getMergedParamTypes() + ")" + interfaceMethod.getReturnType());
+            if (!isStatic) {
                 mvInvoke.visitVarInsn(Opcodes.ALOAD, 1);
-                mvInvoke.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
+                if (!knownNoNeedToCheckCast(interfaceMethod.getParamTypesRaw()[0], targetMethod.getOwnerType()))
+                    mvInvoke.visitTypeInsn(Opcodes.CHECKCAST, targetMethod.getOwnerClass());
             }
-            if (parameterTypes.length > 0) {
-                int count = 0;
-                for (Class<?> paramType : parameterTypes) {
-                    assert paramType != void.class;
-                    mvInvoke.visitVarInsn(Opcodes.ALOAD, 2);
-                    if (count <= 32767) {
-                        if (count <= 127) {
-                            switch (count) {
-                                case 0:
-                                    mvInvoke.visitInsn(Opcodes.ICONST_0);
-                                    break;
-                                case 1:
-                                    mvInvoke.visitInsn(Opcodes.ICONST_1);
-                                    break;
-                                case 2:
-                                    mvInvoke.visitInsn(Opcodes.ICONST_2);
-                                    break;
-                                case 3:
-                                    mvInvoke.visitInsn(Opcodes.ICONST_3);
-                                    break;
-                                case 4:
-                                    mvInvoke.visitInsn(Opcodes.ICONST_4);
-                                    break;
-                                case 5:
-                                    mvInvoke.visitInsn(Opcodes.ICONST_5);
-                                    break;
-                                default:
-                                    mvInvoke.visitIntInsn(Opcodes.BIPUSH, count);
-                            }
-                        } else {
-                            mvInvoke.visitIntInsn(Opcodes.SIPUSH, count);
-                        }
-                    } else {
-                        mvInvoke.visitLdcInsn(count);
+            if (targetMethod.getParamTypesRaw().length > 0) {
+                final int offset = interfaceMethod.getParamTypesRaw().length - targetMethod.getParamTypesRaw().length;
+                assert offset == 0 || offset == 1;
+                int localVariableTableIndex = 1 + offset;
+                for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
+                    switch (interfaceMethod.getParamTypesRaw()[i + offset].charAt(0)) {
+                        case 'L':
+                        case '[':
+                            mvInvoke.visitVarInsn(Opcodes.ALOAD, localVariableTableIndex);
+                            break;
+                        case 'Z':
+                        case 'B':
+                        case 'C':
+                        case 'I':
+                        case 'S':
+                            mvInvoke.visitVarInsn(Opcodes.ILOAD, localVariableTableIndex);
+                            break;
+                        case 'F':
+                            mvInvoke.visitVarInsn(Opcodes.FLOAD, localVariableTableIndex);
+                            break;
+                        case 'D':
+                            mvInvoke.visitVarInsn(Opcodes.DLOAD, localVariableTableIndex);
+                            localVariableTableIndex++;
+                            break;
+                        case 'J':
+                            mvInvoke.visitVarInsn(Opcodes.LLOAD, localVariableTableIndex);
+                            localVariableTableIndex++;
+                            break;
+                        default:
+                            shouldNotReachHere();
                     }
-                    mvInvoke.visitInsn(Opcodes.AALOAD);
-                    if (paramType.isPrimitive())
-                        unboxingOnStack(mvInvoke, paramType);
-                    count++;
-                    if (count < 0)
-                        throw new ArithmeticException("integer overflow");
+                    checkCastOrBox(mvInvoke, interfaceMethod.getParamTypesRaw()[i + offset], targetMethod.getParamTypesRaw()[i]);
+                    localVariableTableIndex++;
+                    if (localVariableTableIndex < 0)
+                        shouldNotReachHere();
                 }
-            }
-            if (isStatic(modifiers)) {
-                mvInvoke.visitMethodInsn(Opcodes.INVOKESTATIC, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
-            } else if (forceSpecial || isPrivate(modifiers)) {
-                mvInvoke.visitMethodInsn(Opcodes.INVOKESPECIAL, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
-            } else if (isInterface(ownerClass.getModifiers())) {
-                mvInvoke.visitMethodInsn(Opcodes.INVOKEINTERFACE, internalize(ownerClass.getName()), name, descriptor, true);
-            } else {
-                mvInvoke.visitMethodInsn(Opcodes.INVOKEVIRTUAL, internalize(ownerClass.getName()), name, descriptor, false);
-            }
-            if (returnType == void.class) {
-                mvInvoke.visitInsn(Opcodes.ACONST_NULL);
-            } else if (returnType.isPrimitive()) {
-                boxingOnStack(mvInvoke, returnType);
-            }
-            mvInvoke.visitInsn(Opcodes.ARETURN);
-            writeMethodTail(mvInvoke);
-        }
-        if (canUseInvokeExact) {
-            final MethodVisitor mvInvokeExact;
-            {
-                final StringBuilder methodExactDescriptor = new StringBuilder("(Ljava/lang/Object;");
-                for (Class<?> paramType : parameterTypes) {
-                    assert paramType != void.class;
-                    methodExactDescriptor.append(getClassDescName(paramType.isPrimitive() ? paramType : Object.class));
-                }
-                methodExactDescriptor.append(')');
-                methodExactDescriptor.append(getClassDescName(returnType.isPrimitive() ? returnType : Object.class));
-                mvInvokeExact = writeMethodHead(cw, "invokeFor" + captureName(returnType.isPrimitive() ? returnType.getSimpleName() : Object.class.getSimpleName()), methodExactDescriptor.toString());
-            }
-            if (!isStatic(modifiers)) {
-                mvInvokeExact.visitVarInsn(Opcodes.ALOAD, 1);
-                mvInvokeExact.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
             }
             {
-                int index = 2;
-                for (final Class<?> paramType : parameterTypes) {
-                    if (paramType.isPrimitive()) {
-                        if (paramType == boolean.class
-                                || paramType == byte.class
-                                || paramType == char.class
-                                || paramType == int.class
-                                || paramType == short.class
-                        ) {
-                            mvInvokeExact.visitVarInsn(Opcodes.ILOAD, index);
-                        } else if (paramType == double.class) {
-                            mvInvokeExact.visitVarInsn(Opcodes.DLOAD, index);
-                            ++index;
-                        } else if (paramType == float.class) {
-                            mvInvokeExact.visitVarInsn(Opcodes.FLOAD, index);
-                        } else if (paramType == long.class) {
-                            mvInvokeExact.visitVarInsn(Opcodes.LLOAD, index);
-                            ++index;
-                        } else {
-                            // should not happen
-                            throw new IllegalArgumentException();
-                        }
-                    } else {
-                        mvInvokeExact.visitVarInsn(Opcodes.ALOAD, index);
-                        mvInvokeExact.visitTypeInsn(Opcodes.CHECKCAST, internalize(paramType.getName()));
-                    }
-                    ++index;
-                }
-            }
-            if (isStatic(modifiers)) {
-                mvInvokeExact.visitMethodInsn(Opcodes.INVOKESTATIC, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
-            } else if (forceSpecial || isPrivate(modifiers)) {
-                mvInvokeExact.visitMethodInsn(Opcodes.INVOKESPECIAL, internalize(ownerClass.getName()), name, descriptor, isInterface(ownerClass.getModifiers()));
-            } else if (isInterface(ownerClass.getModifiers())) {
-                mvInvokeExact.visitMethodInsn(Opcodes.INVOKEINTERFACE, internalize(ownerClass.getName()), name, descriptor, true);
-            } else {
-                mvInvokeExact.visitMethodInsn(Opcodes.INVOKEVIRTUAL, internalize(ownerClass.getName()), name, descriptor, false);
-            }
-            if (returnType == void.class) {
-                mvInvokeExact.visitInsn(Opcodes.RETURN);
-            } else if (returnType.isPrimitive()) {
-                if (returnType == boolean.class
-                        || returnType == byte.class
-                        || returnType == char.class
-                        || returnType == int.class
-                        || returnType == short.class
-                ) {
-                    mvInvokeExact.visitInsn(Opcodes.IRETURN);
-                } else if (returnType == double.class) {
-                    mvInvokeExact.visitInsn(Opcodes.DRETURN);
-                } else if (returnType == float.class) {
-                    mvInvokeExact.visitInsn(Opcodes.FRETURN);
-                } else if (returnType == long.class) {
-                    mvInvokeExact.visitInsn(Opcodes.LRETURN);
+                final int opcode;
+                if (isStatic) {
+                    opcode = Opcodes.INVOKESTATIC;
+                } else if (invokeSpecial) {
+                    opcode = Opcodes.INVOKESPECIAL;
+                } else if (targetMethodIsInterface) {
+                    opcode = Opcodes.INVOKEINTERFACE;
                 } else {
-                    throw new IllegalArgumentException();
+                    opcode = Opcodes.INVOKEVIRTUAL;
                 }
-            } else {
-                mvInvokeExact.visitInsn(Opcodes.ARETURN);
+                mvInvoke.visitMethodInsn(opcode, targetMethod.getOwnerClass(), targetMethod.getName(), "(" + targetMethod.getMergedParamTypes() + ")" + targetMethod.getReturnType(), targetClassIsInterface);
             }
-            writeMethodTail(mvInvokeExact);
+            checkCastOrBox(mvInvoke, targetMethod.getReturnType(), interfaceMethod.getReturnType());
+            switch (interfaceMethod.getReturnType().charAt(0)) {
+                case 'V':
+                    mvInvoke.visitInsn(Opcodes.RETURN);
+                case 'L':
+                case '[':
+                    mvInvoke.visitInsn(Opcodes.ARETURN);
+                    break;
+                case 'Z':
+                case 'B':
+                case 'C':
+                case 'I':
+                case 'S':
+                    mvInvoke.visitInsn(Opcodes.IRETURN);
+                    break;
+                case 'F':
+                    mvInvoke.visitInsn(Opcodes.FRETURN);
+                    break;
+                case 'D':
+                    mvInvoke.visitInsn(Opcodes.DRETURN);
+                    break;
+                case 'J':
+                    mvInvoke.visitInsn(Opcodes.LRETURN);
+                    break;
+                default:
+                    shouldNotReachHere();
+            }
+            writeMethodTail(mvInvoke);
         }
         final byte[] classByteArray = writeClassTail(cw);
         try {
             final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, Here.class.getClassLoader(), null);
-            return (MethodAccessor<T>) outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null);
+            return interfaceClass.cast(outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null));
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         } catch (InvocationTargetException e) {

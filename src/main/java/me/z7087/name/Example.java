@@ -30,12 +30,14 @@ public class Example {
         t1 = System.nanoTime();
         System.out.println("method accessor class 2 ok: " + (t1-t) / 1000000.0 + "ms");
         t = System.nanoTime();
-        FieldAccessor<Object> field = FieldFactory.create(Example.class.getDeclaredField("i"));
+        @SuppressWarnings("unchecked")
+        FieldAccessor<Object, Integer> field = (FieldAccessor<Object, Integer>) FieldFactory.create(
+                Example.class.getClassLoader(),
+                Example.class.getDeclaredField("i")
+        );
         System.out.println(field.get(null));
         field.set(null, 1);
-        System.out.println(FieldAccessorCast.toFieldAccessorNO(field).getInt(null));
-        FieldAccessorCast.toFieldAccessorNO(field).setInt(null, 2);
-        System.out.println(FieldAccessorCast.toFieldAccessorNO(field).getInt(null));
+        System.out.println(i);
         t1 = System.nanoTime();
         System.out.println("field accessor class ok: " + (t1-t) / 1000000.0 + "ms");
     }

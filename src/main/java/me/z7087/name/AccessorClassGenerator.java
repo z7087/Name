@@ -21,11 +21,7 @@ public final class AccessorClassGenerator extends AbstractClassGenerator {
     private static volatile boolean done = false;
 
     static {
-        String generatedClassesPath = internalize(Here.class.getName());
-        generatedClassesPath = generatedClassesPath.substring(0,
-                generatedClassesPath.lastIndexOf(Here.class.getSimpleName())
-        );
-        INSTANCE = new AccessorClassGenerator(generatedClassesPath, JavaVersion.getInstance().getVersion() >= 9);
+        INSTANCE = new AccessorClassGenerator(Here.PATH, JavaVersion.getInstance().getVersion() >= 9);
         done = true;
     }
 

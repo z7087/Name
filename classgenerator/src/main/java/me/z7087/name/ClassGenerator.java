@@ -511,7 +511,7 @@ public class ClassGenerator {
         // jvm use a different logic for verifying 1.4- classes' field names
         // that allows us to create classes like "/a", cls.getName() returns ".a"
         // tested on j8 j17 j21 j22
-        if ((f & 1) == 1) {
+        if ((f & 1) != 0) {
             {
                 final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
                 final String className = "a";
@@ -557,7 +557,7 @@ public class ClassGenerator {
         // allows us to create classes like "a/", cls.getName() returns "a."
         // tested on j8 j17 j21, and failed on j21
         // you can use it on j18-
-        if ((f & 2) == 2) {
+        if ((f & 2) != 0) {
             {
                 final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
                 final String className = "a/";
@@ -602,7 +602,7 @@ public class ClassGenerator {
         // and you can merge them
         // create a class and name it "/", cls.getName() returns "."
         // super fun :D
-        if ((f & 4) == 4) {
+        if ((f & 4) != 0) {
             {
                 final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
                 final String className = "/";

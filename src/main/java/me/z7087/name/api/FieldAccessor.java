@@ -1,4 +1,6 @@
 package me.z7087.name.api;
 
-public interface FieldAccessor <T> extends BaseFieldAccessor<T, Object>, FieldAccessorNO<T>, FieldAccessorO<T, Object> {
+public interface FieldAccessor <T, O> {
+    O get(T object);
+    void set(T object, O value);
 }

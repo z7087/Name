@@ -2,7 +2,6 @@ package me.z7087.name;
 
 import me.z7087.name.util.JavaVersion;
 import me.z7087.name.util.ReflectionUtil;
-import sun.misc.Unsafe;
 
 import java.lang.reflect.InvocationTargetException;
 import java.security.ProtectionDomain;
@@ -16,6 +15,7 @@ final class UnsafeClassDefiner {
                                   ClassLoader loader, ProtectionDomain protectionDomain) {
         if (JavaVersion.getInstance().getVersion() <= 10) {
             try {
+                assert ReflectionUtil.theUnsafe != null;
                 // defineClass method in sun.mise.Unsafe still exists
                 return ReflectionUtil.theUnsafe.defineClass(className, classByteArray, 0, classByteArray.length, loader, protectionDomain);
             } catch (NoSuchMethodError e) {
@@ -60,10 +60,12 @@ final class UnsafeClassDefiner {
 
             final Object theInternalUnsafe;
             {
-                final java.lang.reflect.Field theInternalUnsafeField = Unsafe.class.getDeclaredField("theInternalUnsafe");
+                @SuppressWarnings("JavaReflectionMemberAccess")
+                final java.lang.reflect.Field theInternalUnsafeField = sun.misc.Unsafe.class.getDeclaredField("theInternalUnsafe");
                 theInternalUnsafeField.setAccessible(true);
                 theInternalUnsafe = theInternalUnsafeField.get(null);
             }
+            @SuppressWarnings("JavaReflectionMemberAccess")
             final long fieldModuleOffset = ReflectionUtil.theUnsafe.objectFieldOffset(Class.class.getDeclaredField("module"));
             final Object originModule = ReflectionUtil.theUnsafe.getObject(UnsafeClassDefinerJ11.class, fieldModuleOffset);
             ReflectionUtil.theUnsafe.putObject(UnsafeClassDefinerJ11.class, fieldModuleOffset, ReflectionUtil.theUnsafe.getObject(Class.class, fieldModuleOffset));

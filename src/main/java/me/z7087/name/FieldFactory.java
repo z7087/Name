@@ -2,165 +2,241 @@ package me.z7087.name;
 
 import me.z7087.name.api.*;
 import me.z7087.name.generatedclasses.Here;
-import me.z7087.name.util.ReflectionUtil;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.InvocationTargetException;
 
-public class FieldFactory extends AbstractClassGenerator {
-    protected FieldFactory() {}
-    private static <T> FieldAccessor<T> createField(String name, Class<T> ownerClass, int modifiers,
-                                                         Class<?> type, boolean checkExist)
-            throws NoSuchFieldException, NoSuchMethodException {
-        if (ownerClass.isPrimitive())
-            throw new IllegalArgumentException("Owner class cannot be primitive");
-        if (checkExist) {
-            foundField:
-            {
-                for (java.lang.reflect.Field reflectField : ownerClass.getDeclaredFields()) {
-                    if (reflectField.getName().equals(name)
-                            && reflectField.getModifiers() == modifiers
-                            && reflectField.getType() == type
-                    ) {
-                        break foundField;
-                    }
-                }
-                throw new NoSuchFieldException(name);
+public final class FieldFactory extends AbstractClassGenerator {
+    private FieldFactory() {}
+
+    private static void verify(Class<?> interfaceClass,
+                               FieldDesc targetField,
+                               MethodDesc interfaceMethodGet,
+                               MethodDesc interfaceMethodSet,
+                               boolean isStatic) {
+        if (interfaceClass.isPrimitive())
+            throwIllegalArgumentException("interfaceClass cannot be primitive");
+        if (interfaceClass.isArray())
+            throw new IllegalArgumentException("interfaceClass cannot be array");
+
+        if (interfaceMethodGet == null && interfaceMethodSet == null) {
+            throwIllegalArgumentException("getter and setter cannot be both null");
+        } else if (interfaceMethodGet != null && interfaceMethodSet != null) {
+            if (interfaceMethodGet.equalsDescriptor(interfaceMethodSet))
+                throwIllegalArgumentException("getter and setter cannot have same descriptor");
+        }
+
+        {
+            final String className = getClassName(interfaceClass);
+            if ((interfaceMethodGet == null || !className.equals(interfaceMethodGet.getOwnerClass()))
+                    && (interfaceMethodSet == null || !className.equals(interfaceMethodSet.getOwnerClass()))) {
+                throwIllegalArgumentException("interfaceClass is not the owner of any of the getter and setter");
             }
         }
-        if (type.isPrimitive() && type == void.class)
-            throw new IllegalArgumentException("Void can not be field type");
+
+        if (interfaceMethodGet != null) {
+            verifyGetter(targetField, interfaceMethodGet, isStatic);
+        }
+        if (interfaceMethodSet != null) {
+            verifySetter(targetField, interfaceMethodSet, isStatic);
+        }
+    }
+
+    private static void verifyGetter(FieldDesc targetField,
+                                     MethodDesc interfaceMethodGet,
+                                     boolean isStatic) {
+        if (isStatic) {
+            switch (interfaceMethodGet.getParamTypesRaw().length) {
+                case 0:
+                    break;
+                case 1:
+                    // unused arg, but continue
+                    break;
+                default:
+                    throwIllegalArgumentException("interfaceMethodGet has too many parameters: " + interfaceMethodGet.getParamTypesRaw().length);
+            }
+        } else {
+            if (interfaceMethodGet.getParamTypesRaw().length != 1) {
+                throwIllegalArgumentException("interfaceMethodGet has too many or too few parameters: " + interfaceMethodGet.getParamTypesRaw().length);
+            }
+        }
+        if (interfaceMethodGet.getParamTypesRaw().length == 1) {
+            if (isParamTypePrimitive(interfaceMethodGet.getParamTypesRaw()[0])) {
+                throwIllegalArgumentException("interfaceMethodGet parameter 0 cannot be primitive: " + interfaceMethodGet.getParamTypesRaw()[0]);
+            }
+        }
+        if (!canCheckCastOrBox(targetField.getType(), interfaceMethodGet.getReturnType())) {
+            throwIllegalArgumentException("The return value type of interfaceMethodGet is not compatible with the type of targetField: \n" + interfaceMethodGet.getReturnType() + "\n" + targetField.getType());
+        }
+    }
+
+    private static void verifySetter(FieldDesc targetField,
+                                     MethodDesc interfaceMethodSet,
+                                     boolean isStatic) {
+        if (isStatic) {
+            switch (interfaceMethodSet.getParamTypesRaw().length) {
+                case 0:
+                    throwIllegalArgumentException("interfaceMethodSet has not enough parameters: " + interfaceMethodSet.getParamTypesRaw().length);
+                case 1:
+                    break;
+                case 2:
+                    // unused arg, but continue
+                    break;
+                default:
+                    throwIllegalArgumentException("interfaceMethodSet has too many parameters: " + interfaceMethodSet.getParamTypesRaw().length);
+            }
+        } else {
+            if (interfaceMethodSet.getParamTypesRaw().length != 2) {
+                throwIllegalArgumentException("interfaceMethodSet has too many or too few parameters: " + interfaceMethodSet.getParamTypesRaw().length);
+            }
+        }
+        if (!interfaceMethodSet.getReturnType().equals("V")) {
+            throwIllegalArgumentException("The return value type of interfaceMethodSet is not void: " + interfaceMethodSet.getReturnType());
+        }
+        if (interfaceMethodSet.getParamTypesRaw().length == 2) {
+            if (isParamTypePrimitive(interfaceMethodSet.getParamTypesRaw()[0])) {
+                throwIllegalArgumentException("interfaceMethodSet parameter 0 cannot be primitive: " + interfaceMethodSet.getParamTypesRaw()[0]);
+            }
+        }
+        if (!canCheckCastOrBox(interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1], targetField.getType())) {
+            throwIllegalArgumentException("The type of the last parameter of interfaceMethodSet is not compatible with the type of targetField: \n" + interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1] + "\n" + targetField.getType());
+        }
+    }
+
+    private static <T> T createField(ClassLoader loader,
+                                     Class<T> interfaceClass,
+                                     FieldDesc targetField,
+                                     MethodDesc interfaceMethodGet,
+                                     MethodDesc interfaceMethodSet,
+                                     boolean isStatic,
+                                     boolean checkExist
+    ) throws NoSuchFieldException, NoSuchMethodException {
+        verify(
+                interfaceClass,
+                targetField,
+                interfaceMethodGet,
+                interfaceMethodSet,
+                isStatic
+        );
+        assert (interfaceMethodGet != null || interfaceMethodSet != null);
+        if (checkExist) {
+            findField(loader, targetField, isStatic);
+            if (interfaceMethodGet != null)
+                findMethod(loader, interfaceMethodGet);
+            if (interfaceMethodSet != null)
+                findMethod(loader, interfaceMethodSet);
+        }
         final Class<?> superClass = AccessorClassGenerator.getInstance().getGeneratedDoorClass();
         final int id = getId();
-        final String className;
+        final String className = Here.PATH + "GeneratedClass" + id;
+        final String superClassName = getClassName(superClass);
+        final String[] interfaces;
         {
-            String generatedClassesPath = internalize(Here.class.getName());
-            generatedClassesPath = generatedClassesPath.substring(0,
-                    generatedClassesPath.lastIndexOf(Here.class.getSimpleName())
-            );
-            className = generatedClassesPath + "GeneratedClass" + id;
-        }
-        final String superClassName = internalize(superClass.getName());
-        final String[] interfaces = new String[1];
-        {
-            String apiPath = internalize(BaseFieldAccessor.class.getName());
-            apiPath = apiPath.substring(0,
-                    apiPath.lastIndexOf(BaseFieldAccessor.class.getSimpleName())
-            );
-            interfaces[0] = apiPath + "FieldAccessor";
+            if (interfaceMethodGet == null) {
+                interfaces = new String[1];
+                interfaces[0] = interfaceMethodSet.getOwnerClass();
+            } else if (interfaceMethodSet == null) {
+                interfaces = new String[1];
+                interfaces[0] = interfaceMethodGet.getOwnerClass();
+            } else {
+                final String getterOwnerClass = interfaceMethodGet.getOwnerClass();
+                final String setterOwnerClass = interfaceMethodSet.getOwnerClass();
+                if (getterOwnerClass.equals(setterOwnerClass)) {
+                    interfaces = new String[1];
+                    interfaces[0] = getterOwnerClass;
+                } else {
+                    interfaces = new String[2];
+                    interfaces[0] = getterOwnerClass;
+                    interfaces[1] = setterOwnerClass;
+                }
+            }
         }
         final ClassWriter cw = writeClassHead(className, null, superClassName, interfaces);
-        //   unused arg in static calls, should we make get/put-StaticForXXX?
-        {
-            final MethodVisitor mvCommonGetter = writeMethodHead(cw, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
-            if (!isStatic(modifiers)) {
-                mvCommonGetter.visitVarInsn(Opcodes.ALOAD, 1);
-                mvCommonGetter.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
-            }
-            mvCommonGetter.visitFieldInsn(
-                    isStatic(modifiers)
-                    ? Opcodes.GETSTATIC
-                    : Opcodes.GETFIELD,
-                    internalize(ownerClass.getName()), name, getClassDescName(type)
-            );
-            if (type.isPrimitive()) {
-                boxingOnStack(mvCommonGetter, type);
-                mvCommonGetter.visitInsn(Opcodes.ARETURN);
-            } else {
-                mvCommonGetter.visitInsn(Opcodes.ARETURN);
-            }
-            writeMethodTail(mvCommonGetter);
-        }
-        {
-            final MethodVisitor mvCommonSetter = writeMethodHead(cw, "set", "(Ljava/lang/Object;Ljava/lang/Object;)V");
-            if (!isStatic(modifiers)) {
-                mvCommonSetter.visitVarInsn(Opcodes.ALOAD, 1);
-                mvCommonSetter.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
-            }
-            mvCommonSetter.visitVarInsn(Opcodes.ALOAD, 2);
-            if (type.isPrimitive()) {
-                unboxingOnStack(mvCommonSetter, type);
-            } else {
-                mvCommonSetter.visitTypeInsn(Opcodes.CHECKCAST, internalize(type.getName()));
-            }
-            mvCommonSetter.visitFieldInsn(
-                    isStatic(modifiers)
-                            ? Opcodes.PUTSTATIC
-                            : Opcodes.PUTFIELD,
-                    internalize(ownerClass.getName()), name, getClassDescName(type)
-            );
-            mvCommonSetter.visitInsn(Opcodes.RETURN);
-            writeMethodTail(mvCommonSetter);
-        }
-        {
-            final MethodVisitor mvGetter = writeMethodHead(cw, "get" + captureName(type.isPrimitive() ? type.getSimpleName() : Object.class.getSimpleName()), "(Ljava/lang/Object;)" + (type.isPrimitive() ? getClassDescName(type) : getClassDescName(Object.class)));
-            if (!isStatic(modifiers)) {
+        if (interfaceMethodGet != null) {
+            final MethodVisitor mvGetter = writeMethodHead(cw, interfaceMethodGet.getName(), "(" + interfaceMethodGet.getMergedParamTypes() + ")" + interfaceMethodGet.getReturnType());
+            if (!isStatic) {
                 mvGetter.visitVarInsn(Opcodes.ALOAD, 1);
-                mvGetter.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
+                if (!knownNoNeedToCheckCast(interfaceMethodGet.getParamTypesRaw()[0], targetField.getOwnerType()))
+                    mvGetter.visitTypeInsn(Opcodes.CHECKCAST, targetField.getOwnerClass());
             }
             mvGetter.visitFieldInsn(
-                    isStatic(modifiers)
+                    isStatic
                             ? Opcodes.GETSTATIC
                             : Opcodes.GETFIELD,
-                    internalize(ownerClass.getName()), name, getClassDescName(type)
+                    targetField.getOwnerClass(), targetField.getName(), targetField.getType()
             );
-            if (type.isPrimitive()) {
-                if (type == boolean.class
-                        || type == byte.class
-                        || type == char.class
-                        || type == int.class
-                        || type == short.class
-                ) {
+            checkCastOrBox(mvGetter,
+                    targetField.getType(),
+                    interfaceMethodGet.getReturnType()
+            );
+            switch (interfaceMethodGet.getReturnType().charAt(0)) {
+                case 'L':
+                case '[':
+                    mvGetter.visitInsn(Opcodes.ARETURN);
+                    break;
+                case 'Z':
+                case 'B':
+                case 'C':
+                case 'I':
+                case 'S':
                     mvGetter.visitInsn(Opcodes.IRETURN);
-                } else if (type == double.class) {
+                    break;
+                case 'D':
                     mvGetter.visitInsn(Opcodes.DRETURN);
-                } else if (type == float.class) {
+                    break;
+                case 'F':
                     mvGetter.visitInsn(Opcodes.FRETURN);
-                } else if (type == long.class) {
+                    break;
+                case 'J':
                     mvGetter.visitInsn(Opcodes.LRETURN);
-                } else {
-                    throw new IllegalArgumentException();
-                }
-            } else {
-                mvGetter.visitInsn(Opcodes.ARETURN);
+                    break;
+                default:
+                    shouldNotReachHere();
             }
             writeMethodTail(mvGetter);
         }
-        {
-            final MethodVisitor mvSetter = writeMethodHead(cw, "set" + captureName(type.isPrimitive() ? type.getSimpleName() : Object.class.getSimpleName()), "(Ljava/lang/Object;" + (type.isPrimitive() ? getClassDescName(type) : getClassDescName(Object.class)) + ")V");
-            if (!isStatic(modifiers)) {
+        if (interfaceMethodSet != null) {
+            final MethodVisitor mvSetter = writeMethodHead(cw, interfaceMethodSet.getName(), "(" + interfaceMethodSet.getMergedParamTypes() + ")" + interfaceMethodSet.getReturnType());
+            if (!isStatic) {
                 mvSetter.visitVarInsn(Opcodes.ALOAD, 1);
-                mvSetter.visitTypeInsn(Opcodes.CHECKCAST, internalize(ownerClass.getName()));
+                if (!knownNoNeedToCheckCast(interfaceMethodSet.getParamTypesRaw()[0], targetField.getOwnerType()))
+                    mvSetter.visitTypeInsn(Opcodes.CHECKCAST, targetField.getOwnerClass());
             }
-            if (type.isPrimitive()) {
-                if (type == boolean.class
-                        || type == byte.class
-                        || type == char.class
-                        || type == int.class
-                        || type == short.class
-                ) {
-                    mvSetter.visitVarInsn(Opcodes.ILOAD, 2);
-                } else if (type == double.class) {
-                    mvSetter.visitVarInsn(Opcodes.DLOAD, 2);
-                } else if (type == float.class) {
-                    mvSetter.visitVarInsn(Opcodes.FLOAD, 2);
-                } else if (type == long.class) {
-                    mvSetter.visitVarInsn(Opcodes.LLOAD, 2);
-                } else {
-                    // should not happen
-                    throw new IllegalArgumentException();
-                }
-            } else {
-                mvSetter.visitVarInsn(Opcodes.ALOAD, 2);
-                mvSetter.visitTypeInsn(Opcodes.CHECKCAST, internalize(type.getName()));
+            switch (interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1].charAt(0)) {
+                case 'L':
+                case '[':
+                    mvSetter.visitVarInsn(Opcodes.ALOAD, interfaceMethodSet.getParamTypesRaw().length);
+                    break;
+                case 'Z':
+                case 'B':
+                case 'C':
+                case 'I':
+                case 'S':
+                    mvSetter.visitVarInsn(Opcodes.ILOAD, interfaceMethodSet.getParamTypesRaw().length);
+                    break;
+                case 'D':
+                    mvSetter.visitVarInsn(Opcodes.DLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                    break;
+                case 'F':
+                    mvSetter.visitVarInsn(Opcodes.FLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                    break;
+                case 'J':
+                    mvSetter.visitVarInsn(Opcodes.LLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                    break;
+                default:
+                    shouldNotReachHere();
             }
+            checkCastOrBox(mvSetter,
+                    interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1],
+                    targetField.getType()
+            );
             mvSetter.visitFieldInsn(
-                    isStatic(modifiers)
+                    isStatic
                             ? Opcodes.PUTSTATIC
                             : Opcodes.PUTFIELD,
-                    internalize(ownerClass.getName()), name, getClassDescName(type)
+                    targetField.getOwnerClass(), targetField.getName(), targetField.getType()
             );
             mvSetter.visitInsn(Opcodes.RETURN);
             writeMethodTail(mvSetter);
@@ -168,7 +244,7 @@ public class FieldFactory extends AbstractClassGenerator {
         final byte[] classByteArray = writeClassTail(cw);
         try {
             final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, Here.class.getClassLoader(), null);
-            return (FieldAccessor<T>) outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null);
+            return interfaceClass.cast(outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null));
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         } catch (InvocationTargetException e) {
@@ -178,16 +254,27 @@ public class FieldFactory extends AbstractClassGenerator {
         }
     }
 
-    public static <T> FieldAccessor<T> create(java.lang.reflect.Field field)
+    public static FieldAccessor<?, ?> create(ClassLoader loader, java.lang.reflect.Field field)
             throws NoSuchMethodException, NoSuchFieldException {
-        return createField(field.getName(), (Class<T>) field.getDeclaringClass(), field.getModifiers(), field.getType(), false);
+        return createField(
+                loader,
+                FieldAccessor.class,
+                FieldDesc.of(field.getDeclaringClass(), field.getName(), field.getType()),
+                MethodDesc.of(FieldAccessor.class, "get", Object.class, Object.class),
+                MethodDesc.of(FieldAccessor.class, "set", void.class, Object.class, Object.class),
+                isStatic(field.getModifiers()),
+                false
+        );
     }
 
-    public static <T> FieldAccessor<T> create(String name, Class<T> ownerClass, int modifiers, Class<?> type) throws NoSuchMethodException, NoSuchFieldException {
-        return create(name, ownerClass, modifiers, type, true);
-    }
-
-    public static <T> FieldAccessor<T> create(String name, Class<T> ownerClass, int modifiers, Class<?> type, boolean checkExist) throws NoSuchMethodException, NoSuchFieldException {
-        return createField(name, ownerClass, modifiers, type, checkExist);
+    public static <T> T create(ClassLoader loader,
+                               Class<T> getterOrSetterOwnerClass,
+                               FieldDesc targetField,
+                               MethodDesc interfaceMethodGet,
+                               MethodDesc interfaceMethodSet,
+                               boolean isStatic,
+                               boolean checkExist
+    ) throws NoSuchMethodException, NoSuchFieldException {
+        return createField(loader, getterOrSetterOwnerClass, targetField, interfaceMethodGet, interfaceMethodSet, isStatic, checkExist);
     }
 }
