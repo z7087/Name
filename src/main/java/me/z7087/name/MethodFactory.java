@@ -7,26 +7,52 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public final class MethodFactory extends AbstractClassGenerator {
     private MethodFactory() {}
 
     private static void verify(Class<?> interfaceClass,
                                MethodDesc targetMethod,
-                               MethodDesc interfaceMethod,
+                               MethodDesc interfaceMethodExact,
+                               MethodDesc interfaceMethodVarargs,
                                boolean isStatic) {
         if (interfaceClass.isPrimitive())
             throwIllegalArgumentException("interfaceClass cannot be primitive");
         if (interfaceClass.isArray())
-            throw new IllegalArgumentException("interfaceClass cannot be array");
+            throwIllegalArgumentException("interfaceClass cannot be array");
 
-        if (!getClassName(interfaceClass).equals(interfaceMethod.getOwnerClass()))
-            throwIllegalArgumentException("interfaceClass is not the owner of interfaceMethod");
+        if (interfaceMethodExact == null && interfaceMethodVarargs == null) {
+            throwIllegalArgumentException("interfaceMethodExact and interfaceMethodVarargs cannot be both null");
+        } else if (interfaceMethodExact != null && interfaceMethodVarargs != null) {
+            if (interfaceMethodExact.equalsDescriptor(interfaceMethodVarargs))
+                throwIllegalArgumentException("interfaceMethodExact and interfaceMethodVarargs cannot have same descriptor");
+        }
 
-        if (!canCheckCastOrBox(targetMethod.getReturnType(), interfaceMethod.getReturnType()))
-            throwIllegalArgumentException("The return value type of interfaceMethod is not compatible with the return value type of targetMethod: \n" + interfaceMethod.getReturnType() + "\n" + targetMethod.getReturnType());
+        {
+            final String className = getClassName(interfaceClass);
+            if ((interfaceMethodExact == null || !className.equals(interfaceMethodExact.getOwnerClass()))
+                    && (interfaceMethodVarargs == null || !className.equals(interfaceMethodVarargs.getOwnerClass()))) {
+                throwIllegalArgumentException("interfaceClass is not the owner of any of interfaceMethodExact and interfaceMethodVarargs");
+            }
+        }
 
-        final int offsetIndex = interfaceMethod.getParamTypesRaw().length - targetMethod.getParamTypesRaw().length;
+        if (interfaceMethodExact != null) {
+            verifyExact(targetMethod, interfaceMethodExact, isStatic);
+        }
+
+        if (interfaceMethodVarargs != null) {
+            verifyVarargs(targetMethod, interfaceMethodVarargs, isStatic);
+        }
+    }
+
+    private static void verifyExact(MethodDesc targetMethod,
+                                    MethodDesc interfaceMethodExact,
+                                    boolean isStatic) {
+        if (!canCheckCastOrBox(targetMethod.getReturnType(), interfaceMethodExact.getReturnType()))
+            throwIllegalArgumentException("The return value type of interfaceMethodExact is not compatible with the return value type of targetMethod: \n" + interfaceMethodExact.getReturnType() + "\n" + targetMethod.getReturnType());
+
+        final int offsetIndex = interfaceMethodExact.getParamTypesRaw().length - targetMethod.getParamTypesRaw().length;
         switch (offsetIndex) {
             case 0:
                 break;
@@ -35,23 +61,63 @@ public final class MethodFactory extends AbstractClassGenerator {
                     // unused arg, but continue
                     break;
             default:
-                throwIllegalArgumentException("The number of parameters for interfaceMethod is not compatible with targetMethod's: " + interfaceMethod.getParamTypesRaw().length + ", " + targetMethod.getParamTypesRaw().length);
+                throwIllegalArgumentException("The number of parameters for interfaceMethodExact is not compatible with targetMethod's: " + interfaceMethodExact.getParamTypesRaw().length + ", " + targetMethod.getParamTypesRaw().length);
         }
         if (offsetIndex == 1) {
-            if (isParamTypePrimitive(interfaceMethod.getParamTypesRaw()[0])) {
-                throwIllegalArgumentException("interfaceMethod parameter 0 cannot be primitive: " + interfaceMethod.getParamTypesRaw()[0]);
+            if (isParamTypePrimitive(interfaceMethodExact.getParamTypesRaw()[0])) {
+                throwIllegalArgumentException("interfaceMethodExact parameter 0 cannot be primitive: " + interfaceMethodExact.getParamTypesRaw()[0]);
             }
         }
         for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
-            if (!canCheckCastOrBox(interfaceMethod.getParamTypesRaw()[i + offsetIndex], targetMethod.getParamTypesRaw()[i]))
-                throwIllegalArgumentException("The type of interfaceMethod parameter" + (i + offsetIndex) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethod.getParamTypesRaw()[i + offsetIndex] + "\n" + targetMethod.getParamTypesRaw()[i]);
+            if (!canCheckCastOrBox(interfaceMethodExact.getParamTypesRaw()[i + offsetIndex], targetMethod.getParamTypesRaw()[i]))
+                throwIllegalArgumentException("The type of interfaceMethodExact parameter" + (i + offsetIndex) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethodExact.getParamTypesRaw()[i + offsetIndex] + "\n" + targetMethod.getParamTypesRaw()[i]);
+        }
+    }
+
+    private static void verifyVarargs(MethodDesc targetMethod,
+                                    MethodDesc interfaceMethodVarargs,
+                                    boolean isStatic) {
+        // exempt for void -> Object and void -> Void
+        if (!targetMethod.getReturnType().equals("V") || !(interfaceMethodVarargs.getReturnType().equals("Ljava/lang/Object;") || interfaceMethodVarargs.getReturnType().equals("Ljava/lang/Void;"))) {
+            if (!canCheckCastOrBox(targetMethod.getReturnType(), interfaceMethodVarargs.getReturnType()))
+                throwIllegalArgumentException("The return value type of interfaceMethodVarargs is not compatible with the return value type of targetMethod: \n" + interfaceMethodVarargs.getReturnType() + "\n" + targetMethod.getReturnType());
+        }
+        switch (interfaceMethodVarargs.getParamTypesRaw().length) {
+            case 2:
+                if (!isStatic)
+                    break;
+                // unused arg, but continue
+                break;
+            case 1:
+                if (isStatic)
+                    break;
+            default:
+                throwIllegalArgumentException("The number of parameters for interfaceMethodVarargs is illegal: " + interfaceMethodVarargs.getParamTypesRaw().length);
+        }
+        if (interfaceMethodVarargs.getParamTypesRaw().length == 2) {
+            if (isParamTypePrimitive(interfaceMethodVarargs.getParamTypesRaw()[0])) {
+                throwIllegalArgumentException("interfaceMethodVarargs parameter 0 cannot be primitive: " + interfaceMethodVarargs.getParamTypesRaw()[0]);
+            }
+        }
+        String typeOfArrayElement = null;
+        {
+            final String lastParam = interfaceMethodVarargs.getParamTypesRaw()[interfaceMethodVarargs.getParamTypesRaw().length - 1];
+            if (isParamTypeArray(lastParam))
+                typeOfArrayElement = getArrayElementType(lastParam);
+            else
+                throwIllegalArgumentException("interfaceMethodVarargs parameter " + (interfaceMethodVarargs.getParamTypesRaw().length - 1) + " is not an array");
+        }
+        for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
+            if (!canCheckCastOrBox(typeOfArrayElement, targetMethod.getParamTypesRaw()[i]))
+                throwIllegalArgumentException("The type of interfaceMethodVarargs parameter" + (interfaceMethodVarargs.getParamTypesRaw().length - 1) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethodVarargs.getParamTypesRaw()[interfaceMethodVarargs.getParamTypesRaw().length - 1] + "\n" + targetMethod.getParamTypesRaw()[i]);
         }
     }
 
     private static <T> T createMethod(ClassLoader loader,
                                       Class<T> interfaceClass,
                                       MethodDesc targetMethod,
-                                      MethodDesc interfaceMethod,
+                                      MethodDesc interfaceMethodExact,
+                                      MethodDesc interfaceMethodVarargs,
                                       boolean isStatic,
                                       boolean targetClassIsInterface,
                                       boolean targetMethodIsInterface,
@@ -63,59 +129,82 @@ public final class MethodFactory extends AbstractClassGenerator {
         verify(
                 interfaceClass,
                 targetMethod,
-                interfaceMethod,
+                interfaceMethodExact,
+                interfaceMethodVarargs,
                 isStatic
         );
-
+        assert (interfaceMethodExact != null || interfaceMethodVarargs != null);
         if (checkExist) {
             findMethod(loader, targetMethod);
-            findMethod(loader, interfaceMethod);
+            if (interfaceMethodExact != null)
+                findMethod(loader, interfaceMethodExact);
+            if (interfaceMethodVarargs != null)
+                findMethod(loader, interfaceMethodVarargs);
         }
         final Class<?> superClass = AccessorClassGenerator.getInstance().getGeneratedDoorClass();
         final String className = Here.PATH + "GeneratedClass" + getId();
         final String superClassName = getClassName(superClass);
-        final String[] interfaces = new String[1];
-        interfaces[0] = interfaceMethod.getOwnerClass();
-        final ClassWriter cw = writeClassHead(className, null, superClassName, interfaces);
+        final String[] interfaces;
         {
-            final MethodVisitor mvInvoke = writeMethodHead(cw, interfaceMethod.getName(), "(" + interfaceMethod.getMergedParamTypes() + ")" + interfaceMethod.getReturnType());
+            if (interfaceMethodExact == null) {
+                interfaces = new String[1];
+                interfaces[0] = interfaceMethodVarargs.getOwnerClass();
+            } else if (interfaceMethodVarargs == null) {
+                interfaces = new String[1];
+                interfaces[0] = interfaceMethodExact.getOwnerClass();
+            } else {
+                final String exactOwnerClass = interfaceMethodExact.getOwnerClass();
+                final String varargsOwnerClass = interfaceMethodVarargs.getOwnerClass();
+                if (exactOwnerClass.equals(varargsOwnerClass)) {
+                    interfaces = new String[1];
+                    interfaces[0] = exactOwnerClass;
+                } else {
+                    interfaces = new String[2];
+                    interfaces[0] = exactOwnerClass;
+                    interfaces[1] = varargsOwnerClass;
+                }
+            }
+        }
+        final ClassWriter cw = writeClassHead(className, null, superClassName, interfaces);
+        if (interfaceMethodExact != null) {
+            final MethodVisitor mvInvokeExact = writeMethodHead(cw, interfaceMethodExact.getName(), "(" + interfaceMethodExact.getMergedParamTypes() + ")" + interfaceMethodExact.getReturnType());
             if (!isStatic) {
-                mvInvoke.visitVarInsn(Opcodes.ALOAD, 1);
-                if (!knownNoNeedToCheckCast(interfaceMethod.getParamTypesRaw()[0], targetMethod.getOwnerType()))
-                    mvInvoke.visitTypeInsn(Opcodes.CHECKCAST, targetMethod.getOwnerClass());
+                mvInvokeExact.visitVarInsn(Opcodes.ALOAD, 1);
+                if (!knownNoNeedToCheckCast(interfaceMethodExact.getParamTypesRaw()[0], targetMethod.getOwnerType()))
+                    mvInvokeExact.visitTypeInsn(Opcodes.CHECKCAST, targetMethod.getOwnerClass());
             }
             if (targetMethod.getParamTypesRaw().length > 0) {
-                final int offset = interfaceMethod.getParamTypesRaw().length - targetMethod.getParamTypesRaw().length;
+                final int offset = interfaceMethodExact.getParamTypesRaw().length - targetMethod.getParamTypesRaw().length;
                 assert offset == 0 || offset == 1;
                 int localVariableTableIndex = 1 + offset;
                 for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
-                    switch (interfaceMethod.getParamTypesRaw()[i + offset].charAt(0)) {
+                    switch (interfaceMethodExact.getParamTypesRaw()[i + offset].charAt(0)) {
                         case 'L':
                         case '[':
-                            mvInvoke.visitVarInsn(Opcodes.ALOAD, localVariableTableIndex);
+                            mvInvokeExact.visitVarInsn(Opcodes.ALOAD, localVariableTableIndex);
                             break;
                         case 'Z':
                         case 'B':
                         case 'C':
                         case 'I':
                         case 'S':
-                            mvInvoke.visitVarInsn(Opcodes.ILOAD, localVariableTableIndex);
+                            mvInvokeExact.visitVarInsn(Opcodes.ILOAD, localVariableTableIndex);
                             break;
                         case 'F':
-                            mvInvoke.visitVarInsn(Opcodes.FLOAD, localVariableTableIndex);
+                            mvInvokeExact.visitVarInsn(Opcodes.FLOAD, localVariableTableIndex);
                             break;
                         case 'D':
-                            mvInvoke.visitVarInsn(Opcodes.DLOAD, localVariableTableIndex);
+                            mvInvokeExact.visitVarInsn(Opcodes.DLOAD, localVariableTableIndex);
                             localVariableTableIndex++;
                             break;
                         case 'J':
-                            mvInvoke.visitVarInsn(Opcodes.LLOAD, localVariableTableIndex);
+                            mvInvokeExact.visitVarInsn(Opcodes.LLOAD, localVariableTableIndex);
                             localVariableTableIndex++;
                             break;
                         default:
                             shouldNotReachHere();
                     }
-                    checkCastOrBox(mvInvoke, interfaceMethod.getParamTypesRaw()[i + offset], targetMethod.getParamTypesRaw()[i]);
+                    checkCastOrBox(mvInvokeExact, interfaceMethodExact.getParamTypesRaw()[i + offset], targetMethod.getParamTypesRaw()[i]);
                     localVariableTableIndex++;
                     if (localVariableTableIndex < 0)
                         shouldNotReachHere();
@@ -132,36 +221,163 @@ public final class MethodFactory extends AbstractClassGenerator {
                 } else {
                     opcode = Opcodes.INVOKEVIRTUAL;
                 }
-                mvInvoke.visitMethodInsn(opcode, targetMethod.getOwnerClass(), targetMethod.getName(), "(" + targetMethod.getMergedParamTypes() + ")" + targetMethod.getReturnType(), targetClassIsInterface);
+                mvInvokeExact.visitMethodInsn(opcode, targetMethod.getOwnerClass(), targetMethod.getName(), "(" + targetMethod.getMergedParamTypes() + ")" + targetMethod.getReturnType(), targetClassIsInterface);
             }
-            checkCastOrBox(mvInvoke, targetMethod.getReturnType(), interfaceMethod.getReturnType());
-            switch (interfaceMethod.getReturnType().charAt(0)) {
+            checkCastOrBox(mvInvokeExact, targetMethod.getReturnType(), interfaceMethodExact.getReturnType());
+            switch (interfaceMethodExact.getReturnType().charAt(0)) {
                 case 'V':
-                    mvInvoke.visitInsn(Opcodes.RETURN);
+                    mvInvokeExact.visitInsn(Opcodes.RETURN);
+                    break;
                 case 'L':
                 case '[':
-                    mvInvoke.visitInsn(Opcodes.ARETURN);
+                    mvInvokeExact.visitInsn(Opcodes.ARETURN);
                     break;
                 case 'Z':
                 case 'B':
                 case 'C':
                 case 'I':
                 case 'S':
-                    mvInvoke.visitInsn(Opcodes.IRETURN);
+                    mvInvokeExact.visitInsn(Opcodes.IRETURN);
                     break;
                 case 'F':
-                    mvInvoke.visitInsn(Opcodes.FRETURN);
+                    mvInvokeExact.visitInsn(Opcodes.FRETURN);
                     break;
                 case 'D':
-                    mvInvoke.visitInsn(Opcodes.DRETURN);
+                    mvInvokeExact.visitInsn(Opcodes.DRETURN);
                     break;
                 case 'J':
-                    mvInvoke.visitInsn(Opcodes.LRETURN);
+                    mvInvokeExact.visitInsn(Opcodes.LRETURN);
                     break;
                 default:
                     shouldNotReachHere();
             }
-            writeMethodTail(mvInvoke);
+            writeMethodTail(mvInvokeExact);
+        }
+        if (interfaceMethodVarargs != null) {
+            final MethodVisitor mvInvokeVarargs = writeMethodHead(cw, interfaceMethodVarargs.getName(), "(" + interfaceMethodVarargs.getMergedParamTypes() + ")" + interfaceMethodVarargs.getReturnType());
+            if (!isStatic) {
+                mvInvokeVarargs.visitVarInsn(Opcodes.ALOAD, 1);
+                if (!knownNoNeedToCheckCast(interfaceMethodVarargs.getParamTypesRaw()[0], targetMethod.getOwnerType()))
+                    mvInvokeVarargs.visitTypeInsn(Opcodes.CHECKCAST, targetMethod.getOwnerClass());
+            }
+            if (targetMethod.getParamTypesRaw().length > 0) {
+                final int arrayOffset = interfaceMethodVarargs.getParamTypesRaw().length;
+                assert isParamTypeArray(interfaceMethodVarargs.getParamTypesRaw()[arrayOffset - 1]);
+                final String arrayElementType = getArrayElementType(interfaceMethodVarargs.getParamTypesRaw()[arrayOffset - 1]);
+                int opcodeForLoadFromArray = 0;
+                switch (arrayElementType.charAt(0)) {
+                    case 'Z':
+                    case 'B':
+                        opcodeForLoadFromArray = Opcodes.BALOAD;
+                        break;
+                    case 'C':
+                        opcodeForLoadFromArray = Opcodes.CALOAD;
+                        break;
+                    case 'D':
+                        opcodeForLoadFromArray = Opcodes.DALOAD;
+                        break;
+                    case 'F':
+                        opcodeForLoadFromArray = Opcodes.FALOAD;
+                        break;
+                    case 'I':
+                        opcodeForLoadFromArray = Opcodes.IALOAD;
+                        break;
+                    case 'J':
+                        opcodeForLoadFromArray = Opcodes.LALOAD;
+                        break;
+                    case 'S':
+                        opcodeForLoadFromArray = Opcodes.SALOAD;
+                        break;
+                    case 'L':
+                    case '[':
+                        opcodeForLoadFromArray = Opcodes.AALOAD;
+                        break;
+                    default:
+                        shouldNotReachHere();
+                }
+                for (int arrayIndex = 0, length = targetMethod.getParamTypesRaw().length; arrayIndex < length; ++arrayIndex) {
+                    mvInvokeVarargs.visitVarInsn(Opcodes.ALOAD, arrayOffset);
+                    if (arrayIndex <= 32767) {
+                        if (arrayIndex <= 127) {
+                            switch (arrayIndex) {
+                                case 0:
+                                    mvInvokeVarargs.visitInsn(Opcodes.ICONST_0);
+                                    break;
+                                case 1:
+                                    mvInvokeVarargs.visitInsn(Opcodes.ICONST_1);
+                                    break;
+                                case 2:
+                                    mvInvokeVarargs.visitInsn(Opcodes.ICONST_2);
+                                    break;
+                                case 3:
+                                    mvInvokeVarargs.visitInsn(Opcodes.ICONST_3);
+                                    break;
+                                case 4:
+                                    mvInvokeVarargs.visitInsn(Opcodes.ICONST_4);
+                                    break;
+                                case 5:
+                                    mvInvokeVarargs.visitInsn(Opcodes.ICONST_5);
+                                    break;
+                                default:
+                                    mvInvokeVarargs.visitIntInsn(Opcodes.BIPUSH, arrayIndex);
+                            }
+                        } else {
+                            mvInvokeVarargs.visitIntInsn(Opcodes.SIPUSH, arrayIndex);
+                        }
+                    } else {
+                        mvInvokeVarargs.visitLdcInsn(arrayIndex);
+                    }
+                    mvInvokeVarargs.visitInsn(opcodeForLoadFromArray);
+                    checkCastOrBox(mvInvokeVarargs, arrayElementType, targetMethod.getParamTypesRaw()[arrayIndex]);
+                }
+            }
+            {
+                final int opcode;
+                if (isStatic) {
+                    opcode = Opcodes.INVOKESTATIC;
+                } else if (invokeSpecial) {
+                    opcode = Opcodes.INVOKESPECIAL;
+                } else if (targetMethodIsInterface) {
+                    opcode = Opcodes.INVOKEINTERFACE;
+                } else {
+                    opcode = Opcodes.INVOKEVIRTUAL;
+                }
+                mvInvokeVarargs.visitMethodInsn(opcode, targetMethod.getOwnerClass(), targetMethod.getName(), "(" + targetMethod.getMergedParamTypes() + ")" + targetMethod.getReturnType(), targetClassIsInterface);
+            }
+            if (targetMethod.getReturnType().equals("V") && (interfaceMethodVarargs.getReturnType().equals("Ljava/lang/Object;") || interfaceMethodVarargs.getReturnType().equals("Ljava/lang/Void;"))) {
+                mvInvokeVarargs.visitInsn(Opcodes.ACONST_NULL);
+                mvInvokeVarargs.visitInsn(Opcodes.ARETURN);
+            } else {
+                checkCastOrBox(mvInvokeVarargs, targetMethod.getReturnType(), interfaceMethodVarargs.getReturnType());
+                switch (interfaceMethodVarargs.getReturnType().charAt(0)) {
+                    case 'V':
+                        mvInvokeVarargs.visitInsn(Opcodes.RETURN);
+                        break;
+                    case 'L':
+                    case '[':
+                        mvInvokeVarargs.visitInsn(Opcodes.ARETURN);
+                        break;
+                    case 'Z':
+                    case 'B':
+                    case 'C':
+                    case 'I':
+                    case 'S':
+                        mvInvokeVarargs.visitInsn(Opcodes.IRETURN);
+                        break;
+                    case 'F':
+                        mvInvokeVarargs.visitInsn(Opcodes.FRETURN);
+                        break;
+                    case 'D':
+                        mvInvokeVarargs.visitInsn(Opcodes.DRETURN);
+                        break;
+                    case 'J':
+                        mvInvokeVarargs.visitInsn(Opcodes.LRETURN);
+                        break;
+                    default:
+                        shouldNotReachHere();
+                }
+            }
+            writeMethodTail(mvInvokeVarargs);
         }
         final byte[] classByteArray = writeClassTail(cw);
         try {
@@ -176,35 +392,51 @@ public final class MethodFactory extends AbstractClassGenerator {
         }
     }
 
-    public static <T> MethodAccessor<T> create(java.lang.reflect.Method method) throws NoSuchMethodException {
-        return createMethod(method.getName(), (Class<T>) method.getDeclaringClass(), method.getModifiers(), method.getParameterTypes(), method.getReturnType(), false, false);
+    public static MethodAccessor<?, ?> create(ClassLoader loader,
+                                                     Method method,
+                                                     boolean invokeSpecial
+    ) throws NoSuchMethodException {
+        return createMethod(
+                loader,
+                MethodAccessor.class,
+                MethodDesc.of(
+                        method.getDeclaringClass(),
+                        method.getName(),
+                        method.getReturnType(),
+                        method.getParameterTypes()
+                ),
+                null,
+                MethodDesc.of(MethodAccessor.class, "invoke", Object.class, Object.class, Object[].class),
+                isStatic(method.getModifiers()),
+                isInterface(method.getDeclaringClass().getModifiers()),
+                isInterface(method.getModifiers()),
+                invokeSpecial,
+                false
+        );
     }
 
-    public static <T> MethodAccessor<T> create(String name, Class<T> clazz, int modifiers,
-                                Class<?>[] parameterTypes, Class<?> returnType) throws NoSuchMethodException {
-        return create(name, clazz, modifiers, parameterTypes, returnType, true);
-    }
-
-    public static <T> MethodAccessor<T> create(String name, Class<T> clazz, int modifiers,
-                                Class<?>[] parameterTypes, Class<?> returnType,
-                                boolean checkExist) throws NoSuchMethodException {
-        return createMethod(name, clazz, modifiers, parameterTypes, returnType, false, checkExist);
-    }
-
-    // create a handler that invokes a virtual method directly, ignore methods in subclasses
-    // NEED MORE TEST
-    public static <T> MethodAccessor<T> createSpecial(java.lang.reflect.Method method) throws NoSuchMethodException {
-        return createMethod(method.getName(), (Class<T>) method.getDeclaringClass(), method.getModifiers(), method.getParameterTypes(), method.getReturnType(), true, false);
-    }
-
-    public static <T> MethodAccessor<T> createSpecial(String name, Class<T> clazz, int modifiers,
-                                Class<?>[] parameterTypes, Class<?> returnType) throws NoSuchMethodException {
-        return createSpecial(name, clazz, modifiers, parameterTypes, returnType, true);
-    }
-
-    public static <T> MethodAccessor<T> createSpecial(String name, Class<T> clazz, int modifiers,
-                                Class<?>[] parameterTypes, Class<?> returnType,
-                                boolean checkExist) throws NoSuchMethodException {
-        return createMethod(name, clazz, modifiers, parameterTypes, returnType, true, checkExist);
+    public static <T> T create(ClassLoader loader,
+                                      Class<T> interfaceClass,
+                                      MethodDesc targetMethod,
+                                      MethodDesc interfaceMethodExact,
+                                      MethodDesc interfaceMethodVarargs,
+                                      boolean isStatic,
+                                      boolean targetClassIsInterface,
+                                      boolean targetMethodIsInterface,
+                                      boolean invokeSpecial,
+                                      boolean checkExist
+    ) throws NoSuchMethodException {
+        return createMethod(
+                loader,
+                interfaceClass,
+                targetMethod,
+                interfaceMethodExact,
+                interfaceMethodVarargs,
+                isStatic,
+                targetClassIsInterface,
+                targetMethodIsInterface,
+                invokeSpecial,
+                checkExist
+        );
     }
 }

@@ -19,7 +19,7 @@ public final class FieldFactory extends AbstractClassGenerator {
         if (interfaceClass.isPrimitive())
             throwIllegalArgumentException("interfaceClass cannot be primitive");
         if (interfaceClass.isArray())
-            throw new IllegalArgumentException("interfaceClass cannot be array");
+            throwIllegalArgumentException("interfaceClass cannot be array");
 
         if (interfaceMethodGet == null && interfaceMethodSet == null) {
             throwIllegalArgumentException("getter and setter cannot be both null");
@@ -129,8 +129,7 @@ public final class FieldFactory extends AbstractClassGenerator {
                 findMethod(loader, interfaceMethodSet);
         }
         final Class<?> superClass = AccessorClassGenerator.getInstance().getGeneratedDoorClass();
-        final int id = getId();
-        final String className = Here.PATH + "GeneratedClass" + id;
+        final String className = Here.PATH + "GeneratedClass" + getId();
         final String superClassName = getClassName(superClass);
         final String[] interfaces;
         {

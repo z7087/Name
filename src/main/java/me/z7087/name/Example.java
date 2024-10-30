@@ -1,7 +1,7 @@
 package me.z7087.name;
 
-import me.z7087.name.api.BaseMethodAccessor;
 import me.z7087.name.api.FieldAccessor;
+import me.z7087.name.api.MethodAccessor;
 
 public class Example {
     private static int i = 0;
@@ -18,15 +18,21 @@ public class Example {
         long t1 = System.nanoTime();
         System.out.println("door class ok: " + (t1-t) / 1000000.0 + "ms");
         t = System.nanoTime();
-        BaseMethodAccessor<Example> method = MethodFactory.create(Example.class.getDeclaredMethod("a", (Class<?>[]) null));
-        method.invoke(null, "1");
-        method.invokeForVoid(null);
+        MethodAccessor<?, ?> method = MethodFactory.create(
+                Example.class.getClassLoader(),
+                Example.class.getDeclaredMethod("a", (Class<?>[]) null),
+                false
+        );
+        method.invoke(null, "unused arg");
         t1 = System.nanoTime();
         System.out.println("method accessor class ok: " + (t1-t) / 1000000.0 + "ms");
         t = System.nanoTime();
-        BaseMethodAccessor<Example> method2 = MethodFactory.create(Example.class.getDeclaredMethod("a", (Class<?>[]) null));
-        method2.invoke(null, "1");
-        method2.invokeForVoid(null);
+        MethodAccessor<?, ?> method2 = MethodFactory.create(
+                Example.class.getClassLoader(),
+                Example.class.getDeclaredMethod("a", (Class<?>[]) null),
+                false
+        );
+        method2.invoke(null, "unused arg");
         t1 = System.nanoTime();
         System.out.println("method accessor class 2 ok: " + (t1-t) / 1000000.0 + "ms");
         t = System.nanoTime();
@@ -40,5 +46,16 @@ public class Example {
         System.out.println(i);
         t1 = System.nanoTime();
         System.out.println("field accessor class ok: " + (t1-t) / 1000000.0 + "ms");
+        t = System.nanoTime();
+        @SuppressWarnings("unchecked")
+        FieldAccessor<Object, Integer> field2 = (FieldAccessor<Object, Integer>) FieldFactory.create(
+                Example.class.getClassLoader(),
+                Example.class.getDeclaredField("i")
+        );
+        System.out.println(field2.get(null));
+        field2.set(null, 1);
+        System.out.println(i);
+        t1 = System.nanoTime();
+        System.out.println("field accessor class 2 ok: " + (t1-t) / 1000000.0 + "ms");
     }
 }

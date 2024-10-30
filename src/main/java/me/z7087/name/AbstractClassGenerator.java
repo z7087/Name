@@ -5,7 +5,6 @@ import org.objectweb.asm.MethodVisitor;
 
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -214,6 +213,13 @@ abstract class AbstractClassGenerator {
                     return false;
                 throw new IllegalArgumentException("Unknown type: " + type);
         }
+    }
+
+    protected static String getArrayElementType(String arrayType) {
+        if (arrayType.charAt(0) == '[')
+            return arrayType.substring(1);
+
+        throw new IllegalArgumentException("type " + arrayType + " is not an array");
     }
 
     protected static void boxingOnStack(MethodVisitor mv, Class<?> sourceClass) {
