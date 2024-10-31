@@ -1,12 +1,15 @@
 package me.z7087.name;
 
-import me.z7087.name.api.*;
+import me.z7087.name.api.FieldAccessor;
 import me.z7087.name.generatedclasses.Here;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 
 import java.lang.reflect.InvocationTargetException;
+
+import static org.objectweb.asm.Opcodes.*;
 
 public final class FieldFactory extends AbstractClassGenerator {
     private FieldFactory() {}
@@ -105,12 +108,161 @@ public final class FieldFactory extends AbstractClassGenerator {
         }
     }
 
+    private static ClassWriter writeClassHeadForFinal(String className,
+                                                      String signature,
+                                                      String superName,
+                                                      String[] interfaces,
+                                                      FieldDesc targetField,
+                                                      boolean isStatic
+    ) {
+        final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+        cw.visit(V1_6, ACC_PUBLIC, className, signature, superName, interfaces);
+        cw.visitField(
+                ACC_PRIVATE | ACC_FINAL,
+                "offset",
+                "J",
+                null,
+                null).visitEnd();
+        cw.visitField(
+                ACC_PRIVATE | ACC_FINAL,
+                "base",
+                "Ljava/lang/Object;",
+                null,
+                null).visitEnd();
+        writeConstructorForFinal(cw, className, superName, targetField, isStatic);
+        return cw;
+    }
+
+    @SuppressWarnings("CommentedOutCode")
+    private static void writeConstructorForFinal(ClassWriter cw,
+                                                 String className,
+                                                 String superName,
+                                                 FieldDesc targetField,
+                                                 boolean isStatic
+    ) {
+        final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
+        // Field[] fl = targetFieldClass.class.privateGetDeclaredFields(false);
+        // int arrayLength = fl.length;
+        // int i = 0;
+        mv.visitLdcInsn(Type.getType(targetField.getOwnerType()));
+        mv.visitInsn(ICONST_0);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "privateGetDeclaredFields", "(Z)[Ljava/lang/reflect/Field;", false);
+        mv.visitVarInsn(ASTORE, 1);
+        mv.visitVarInsn(ALOAD, 1);
+        mv.visitInsn(ARRAYLENGTH);
+        mv.visitVarInsn(ISTORE, 2);
+        mv.visitInsn(ICONST_0);
+        mv.visitVarInsn(ISTORE, 3);
+        // for (; i < arrayLength; i++) {
+        //     Field temp = fl[i];
+        //     if (temp.getName.equals("targetFieldName") && temp.getType.equals(targetFieldType.class)) {
+        //        // if static:
+        //         this.offset = unsafe.staticFieldOffset(temp);
+        //         this.base = unsafe.staticFieldBase(temp);
+        //        // if end, else:
+        //         this.offset = unsafe.objectFieldOffset(temp);
+        //         this.base = null;
+        //        // else end
+        //         return;
+        //     }
+        // }
+        // throw new IllegalArgumentException(new NoSuchFieldException("targetFieldClassName.targetFieldName targetFieldType"));
+        Label loopStart = new Label();
+        Label loopEnd = new Label();
+        Label loopBackToStart = new Label();
+        mv.visitLabel(loopStart);
+        mv.visitVarInsn(ILOAD, 3);
+        mv.visitVarInsn(ILOAD, 2);
+        mv.visitJumpInsn(IF_ICMPGE, loopEnd);
+        mv.visitVarInsn(ALOAD, 1);
+        mv.visitVarInsn(ILOAD, 3);
+        mv.visitInsn(AALOAD);
+        mv.visitVarInsn(ASTORE, 4);
+        mv.visitVarInsn(ALOAD, 4);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/reflect/Field", "getName", "()Ljava/lang/String;", false);
+        mv.visitLdcInsn(targetField.getName());
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/String", "equals", "(Ljava/lang/Object;)Z", false);
+        mv.visitJumpInsn(IFEQ, loopBackToStart);
+        mv.visitVarInsn(ALOAD, 4);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/reflect/Field", "getType", "()Ljava/lang/Class;", false);
+        switch (targetField.getType().charAt(0)) {
+            case 'L':
+            case '[':
+                mv.visitLdcInsn(Type.getType(targetField.getType()));
+                break;
+            case 'Z':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Boolean", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'B':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Byte", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'C':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Character", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'D':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Double", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'F':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Float", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'I':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Integer", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'J':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Long", "TYPE", "Ljava/lang/Class;");
+                break;
+            case 'S':
+                mv.visitFieldInsn(GETSTATIC, "java/lang/Short", "TYPE", "Ljava/lang/Class;");
+                break;
+            default:
+                shouldNotReachHere();
+        }
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "equals", "(Ljava/lang/Object;)Z", false);
+        mv.visitJumpInsn(IFEQ, loopBackToStart);
+        mv.visitVarInsn(ALOAD, 0);
+        mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+        mv.visitVarInsn(ALOAD, 4);
+        if (isStatic) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "staticFieldOffset", "(Ljava/lang/reflect/Field;)J", false);
+        } else {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "objectFieldOffset", "(Ljava/lang/reflect/Field;)J", false);
+        }
+        mv.visitFieldInsn(PUTFIELD, className, "offset", "J");
+        mv.visitVarInsn(ALOAD, 0);
+        if (isStatic) {
+            mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+            mv.visitVarInsn(ALOAD, 4);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "staticFieldBase", "(Ljava/lang/reflect/Field;)Ljava/lang/Object;", false);
+        } else {
+            mv.visitInsn(ACONST_NULL);
+        }
+        mv.visitFieldInsn(PUTFIELD, className, "base", "Ljava/lang/Object;");
+        mv.visitInsn(RETURN);
+        mv.visitLabel(loopBackToStart);
+        mv.visitIincInsn(3, 1);
+        mv.visitJumpInsn(GOTO, loopStart);
+        mv.visitLabel(loopEnd);
+        mv.visitTypeInsn(NEW, "java/lang/IllegalArgumentException");
+        mv.visitInsn(DUP);
+        mv.visitTypeInsn(NEW, "java/lang/NoSuchFieldException");
+        mv.visitInsn(DUP);
+        mv.visitLdcInsn(targetField.getOwnerClass() + "." + targetField.getName() + " " + targetField.getType());
+        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/NoSuchFieldException", "<init>", "(Ljava/lang/String;)V", false);
+        mv.visitMethodInsn(INVOKESPECIAL, "java/lang/IllegalArgumentException", "<init>", "(Ljava/lang/Throwable;)V", false);
+        mv.visitInsn(ATHROW);
+        mv.visitMaxs(-1, -1);
+        mv.visitEnd();
+    }
+
     private static <T> T createField(ClassLoader loader,
                                      Class<T> interfaceClass,
                                      FieldDesc targetField,
                                      MethodDesc interfaceMethodGet,
                                      MethodDesc interfaceMethodSet,
                                      boolean isStatic,
+                                     boolean isFinal,
                                      boolean checkExist
     ) throws NoSuchFieldException, NoSuchMethodException {
         verify(
@@ -122,7 +274,7 @@ public final class FieldFactory extends AbstractClassGenerator {
         );
         assert (interfaceMethodGet != null || interfaceMethodSet != null);
         if (checkExist) {
-            findField(loader, targetField, isStatic);
+            findDeclaredField(loader, targetField, isStatic);
             if (interfaceMethodGet != null)
                 findMethod(loader, interfaceMethodGet);
             if (interfaceMethodSet != null)
@@ -152,18 +304,23 @@ public final class FieldFactory extends AbstractClassGenerator {
                 }
             }
         }
-        final ClassWriter cw = writeClassHead(className, null, superClassName, interfaces);
+        final ClassWriter cw;
+        if (isFinal && interfaceMethodSet != null) {
+            cw = writeClassHeadForFinal(className, null, superClassName, interfaces, targetField, isStatic);
+        } else {
+            cw = writeClassHead(className, null, superClassName, interfaces);
+        }
         if (interfaceMethodGet != null) {
             final MethodVisitor mvGetter = writeMethodHead(cw, interfaceMethodGet.getName(), "(" + interfaceMethodGet.getMergedParamTypes() + ")" + interfaceMethodGet.getReturnType());
             if (!isStatic) {
-                mvGetter.visitVarInsn(Opcodes.ALOAD, 1);
+                mvGetter.visitVarInsn(ALOAD, 1);
                 if (!knownNoNeedToCheckCast(interfaceMethodGet.getParamTypesRaw()[0], targetField.getOwnerType()))
-                    mvGetter.visitTypeInsn(Opcodes.CHECKCAST, targetField.getOwnerClass());
+                    mvGetter.visitTypeInsn(CHECKCAST, targetField.getOwnerClass());
             }
             mvGetter.visitFieldInsn(
                     isStatic
-                            ? Opcodes.GETSTATIC
-                            : Opcodes.GETFIELD,
+                            ? GETSTATIC
+                            : GETFIELD,
                     targetField.getOwnerClass(), targetField.getName(), targetField.getType()
             );
             checkCastOrBox(mvGetter,
@@ -173,23 +330,23 @@ public final class FieldFactory extends AbstractClassGenerator {
             switch (interfaceMethodGet.getReturnType().charAt(0)) {
                 case 'L':
                 case '[':
-                    mvGetter.visitInsn(Opcodes.ARETURN);
+                    mvGetter.visitInsn(ARETURN);
                     break;
                 case 'Z':
                 case 'B':
                 case 'C':
                 case 'I':
                 case 'S':
-                    mvGetter.visitInsn(Opcodes.IRETURN);
+                    mvGetter.visitInsn(IRETURN);
                     break;
                 case 'D':
-                    mvGetter.visitInsn(Opcodes.DRETURN);
+                    mvGetter.visitInsn(DRETURN);
                     break;
                 case 'F':
-                    mvGetter.visitInsn(Opcodes.FRETURN);
+                    mvGetter.visitInsn(FRETURN);
                     break;
                 case 'J':
-                    mvGetter.visitInsn(Opcodes.LRETURN);
+                    mvGetter.visitInsn(LRETURN);
                     break;
                 default:
                     shouldNotReachHere();
@@ -198,46 +355,130 @@ public final class FieldFactory extends AbstractClassGenerator {
         }
         if (interfaceMethodSet != null) {
             final MethodVisitor mvSetter = writeMethodHead(cw, interfaceMethodSet.getName(), "(" + interfaceMethodSet.getMergedParamTypes() + ")" + interfaceMethodSet.getReturnType());
-            if (!isStatic) {
-                mvSetter.visitVarInsn(Opcodes.ALOAD, 1);
-                if (!knownNoNeedToCheckCast(interfaceMethodSet.getParamTypesRaw()[0], targetField.getOwnerType()))
-                    mvSetter.visitTypeInsn(Opcodes.CHECKCAST, targetField.getOwnerClass());
+            if (isFinal) {
+                mvSetter.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+                if (isStatic) {
+                    mvSetter.visitVarInsn(ALOAD, 0);
+                    mvSetter.visitFieldInsn(GETFIELD, className, "base", "Ljava/lang/Object;");
+                } else {
+                    mvSetter.visitVarInsn(ALOAD, 1);
+                }
+                mvSetter.visitVarInsn(ALOAD, 0);
+                mvSetter.visitFieldInsn(GETFIELD, className, "offset", "J");
+                switch (interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1].charAt(0)) {
+                    case 'L':
+                    case '[':
+                        mvSetter.visitVarInsn(ALOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'Z':
+                    case 'B':
+                    case 'C':
+                    case 'I':
+                    case 'S':
+                        mvSetter.visitVarInsn(ILOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'D':
+                        mvSetter.visitVarInsn(DLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'F':
+                        mvSetter.visitVarInsn(FLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'J':
+                        mvSetter.visitVarInsn(LLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    default:
+                        shouldNotReachHere();
+                }
+                checkCastOrBox(mvSetter,
+                        interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1],
+                        targetField.getType()
+                );
+                String unsafeMethodName = null, unsafeMethodDesc = null;
+                switch (targetField.getType().charAt(0)) {
+                    case 'L':
+                    case '[':
+                        unsafeMethodName = "putObjectVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JLjava/lang/Object;)V";
+                        break;
+                    case 'Z':
+                        unsafeMethodName = "putBooleanVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JZ)V";
+                        break;
+                    case 'B':
+                        unsafeMethodName = "putByteVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JB)V";
+                        break;
+                    case 'C':
+                        unsafeMethodName = "putCharVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JC)V";
+                        break;
+                    case 'I':
+                        unsafeMethodName = "putIntVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JI)V";
+                        break;
+                    case 'S':
+                        unsafeMethodName = "putShortVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JS)V";
+                        break;
+                    case 'D':
+                        unsafeMethodName = "putDoubleVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JD)V";
+                        break;
+                    case 'F':
+                        unsafeMethodName = "putFloatVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JF)V";
+                        break;
+                    case 'J':
+                        unsafeMethodName = "putLongVolatile";
+                        unsafeMethodDesc = "(Ljava/lang/Object;JJ)V";
+                        break;
+                    default:
+                        shouldNotReachHere();
+                }
+                mvSetter.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", unsafeMethodName, unsafeMethodDesc, false);
+                mvSetter.visitInsn(RETURN);
+            } else {
+                if (!isStatic) {
+                    mvSetter.visitVarInsn(ALOAD, 1);
+                    if (!knownNoNeedToCheckCast(interfaceMethodSet.getParamTypesRaw()[0], targetField.getOwnerType()))
+                        mvSetter.visitTypeInsn(CHECKCAST, targetField.getOwnerClass());
+                }
+                switch (interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1].charAt(0)) {
+                    case 'L':
+                    case '[':
+                        mvSetter.visitVarInsn(ALOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'Z':
+                    case 'B':
+                    case 'C':
+                    case 'I':
+                    case 'S':
+                        mvSetter.visitVarInsn(ILOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'D':
+                        mvSetter.visitVarInsn(DLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'F':
+                        mvSetter.visitVarInsn(FLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    case 'J':
+                        mvSetter.visitVarInsn(LLOAD, interfaceMethodSet.getParamTypesRaw().length);
+                        break;
+                    default:
+                        shouldNotReachHere();
+                }
+                checkCastOrBox(mvSetter,
+                        interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1],
+                        targetField.getType()
+                );
+                mvSetter.visitFieldInsn(
+                        isStatic
+                                ? PUTSTATIC
+                                : PUTFIELD,
+                        targetField.getOwnerClass(), targetField.getName(), targetField.getType()
+                );
+                mvSetter.visitInsn(RETURN);
             }
-            switch (interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1].charAt(0)) {
-                case 'L':
-                case '[':
-                    mvSetter.visitVarInsn(Opcodes.ALOAD, interfaceMethodSet.getParamTypesRaw().length);
-                    break;
-                case 'Z':
-                case 'B':
-                case 'C':
-                case 'I':
-                case 'S':
-                    mvSetter.visitVarInsn(Opcodes.ILOAD, interfaceMethodSet.getParamTypesRaw().length);
-                    break;
-                case 'D':
-                    mvSetter.visitVarInsn(Opcodes.DLOAD, interfaceMethodSet.getParamTypesRaw().length);
-                    break;
-                case 'F':
-                    mvSetter.visitVarInsn(Opcodes.FLOAD, interfaceMethodSet.getParamTypesRaw().length);
-                    break;
-                case 'J':
-                    mvSetter.visitVarInsn(Opcodes.LLOAD, interfaceMethodSet.getParamTypesRaw().length);
-                    break;
-                default:
-                    shouldNotReachHere();
-            }
-            checkCastOrBox(mvSetter,
-                    interfaceMethodSet.getParamTypesRaw()[interfaceMethodSet.getParamTypesRaw().length - 1],
-                    targetField.getType()
-            );
-            mvSetter.visitFieldInsn(
-                    isStatic
-                            ? Opcodes.PUTSTATIC
-                            : Opcodes.PUTFIELD,
-                    targetField.getOwnerClass(), targetField.getName(), targetField.getType()
-            );
-            mvSetter.visitInsn(Opcodes.RETURN);
             writeMethodTail(mvSetter);
         }
         final byte[] classByteArray = writeClassTail(cw);
@@ -262,6 +503,7 @@ public final class FieldFactory extends AbstractClassGenerator {
                 MethodDesc.of(FieldAccessor.class, "get", Object.class, Object.class),
                 MethodDesc.of(FieldAccessor.class, "set", void.class, Object.class, Object.class),
                 isStatic(field.getModifiers()),
+                isFinal(field.getModifiers()),
                 false
         );
     }
@@ -272,8 +514,9 @@ public final class FieldFactory extends AbstractClassGenerator {
                                MethodDesc interfaceMethodGet,
                                MethodDesc interfaceMethodSet,
                                boolean isStatic,
+                               boolean isFinal,
                                boolean checkExist
     ) throws NoSuchMethodException, NoSuchFieldException {
-        return createField(loader, getterOrSetterOwnerClass, targetField, interfaceMethodGet, interfaceMethodSet, isStatic, checkExist);
+        return createField(loader, getterOrSetterOwnerClass, targetField, interfaceMethodGet, interfaceMethodSet, isStatic, isFinal, checkExist);
     }
 }

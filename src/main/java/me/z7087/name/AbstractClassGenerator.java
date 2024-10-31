@@ -123,6 +123,10 @@ abstract class AbstractClassGenerator {
         return (ACC_PRIVATE & modifiers) != 0;
     }
 
+    protected static boolean isFinal(int modifiers) {
+        return (ACC_FINAL & modifiers) != 0;
+    }
+
     protected static boolean isInterface(int modifiers) {
         return (ACC_INTERFACE & modifiers) != 0;
     }
@@ -460,6 +464,21 @@ abstract class AbstractClassGenerator {
 
     protected static void findField(ClassLoader loader, FieldDesc desc, boolean isStatic) throws NoSuchFieldException {
         try {
+            for (java.lang.reflect.Field reflectField : Class.forName(desc.getOwnerClass().replace('/', '.'), false, loader).getFields()) {
+                if (reflectField.getName().equals(desc.getName())
+                        && (isStatic == isStatic(reflectField.getModifiers()))
+                        && getClassDescName(reflectField.getType()).equals(desc.getType())
+                ) {
+                    return;
+                }
+            }
+        } catch (ClassNotFoundException ignored) {
+        }
+        throwNoSuchFieldException(desc);
+    }
+
+    protected static void findDeclaredField(ClassLoader loader, FieldDesc desc, boolean isStatic) throws NoSuchFieldException {
+        try {
             for (java.lang.reflect.Field reflectField : Class.forName(desc.getOwnerClass().replace('/', '.'), false, loader).getDeclaredFields()) {
                 if (reflectField.getName().equals(desc.getName())
                         && (isStatic == isStatic(reflectField.getModifiers()))
@@ -476,6 +495,30 @@ abstract class AbstractClassGenerator {
     protected static void findMethod(ClassLoader loader, MethodDesc desc) throws NoSuchMethodException {
         try {
             for (java.lang.reflect.Method reflectMethod : Class.forName(desc.getOwnerClass().replace('/', '.'), false, loader).getMethods()) {
+                if (reflectMethod.getName().equals(desc.getName())
+                        && !isStatic(reflectMethod.getModifiers())
+                        && getClassDescName(reflectMethod.getReturnType()).equals(desc.getReturnType())
+                ) {
+                    notFound:
+                    {
+                        final Class<?>[] reflectParamTypes = reflectMethod.getParameterTypes();
+                        for (int i = 0, length = reflectParamTypes.length; i < length; ++i) {
+                            if (!getClassDescName(reflectParamTypes[i]).equals(desc.getParamTypesRaw()[i])) {
+                                break notFound;
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        } catch (ClassNotFoundException ignored) {
+        }
+        throwNoSuchMethodException(desc);
+    }
+
+    protected static void findDeclaredMethod(ClassLoader loader, MethodDesc desc) throws NoSuchMethodException {
+        try {
+            for (java.lang.reflect.Method reflectMethod : Class.forName(desc.getOwnerClass().replace('/', '.'), false, loader).getDeclaredMethods()) {
                 if (reflectMethod.getName().equals(desc.getName())
                         && !isStatic(reflectMethod.getModifiers())
                         && getClassDescName(reflectMethod.getReturnType()).equals(desc.getReturnType())

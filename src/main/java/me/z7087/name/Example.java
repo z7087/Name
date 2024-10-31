@@ -4,7 +4,7 @@ import me.z7087.name.api.FieldAccessor;
 import me.z7087.name.api.MethodAccessor;
 
 public class Example {
-    private static int i = 0;
+    private static final int i = 0;
     private static void a() {
         System.out.println("YAY");
     }
@@ -41,9 +41,9 @@ public class Example {
                 Example.class.getClassLoader(),
                 Example.class.getDeclaredField("i")
         );
-        System.out.println(field.get(null));
-        field.set(null, 1);
-        System.out.println(i);
+        System.out.println(field.get(null)); // 0
+        field.set(null, 1); // final fields cannot take effect instantly
+        System.out.println(i); // 0
         t1 = System.nanoTime();
         System.out.println("field accessor class ok: " + (t1-t) / 1000000.0 + "ms");
         t = System.nanoTime();
@@ -52,9 +52,9 @@ public class Example {
                 Example.class.getClassLoader(),
                 Example.class.getDeclaredField("i")
         );
-        System.out.println(field2.get(null));
-        field2.set(null, 1);
-        System.out.println(i);
+        System.out.println(field2.get(null)); // 1
+        field2.set(null, 2); // final fields cannot take effect instantly
+        System.out.println(i); // 0
         t1 = System.nanoTime();
         System.out.println("field accessor class 2 ok: " + (t1-t) / 1000000.0 + "ms");
     }

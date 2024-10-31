@@ -135,7 +135,7 @@ public final class MethodFactory extends AbstractClassGenerator {
         );
         assert (interfaceMethodExact != null || interfaceMethodVarargs != null);
         if (checkExist) {
-            findMethod(loader, targetMethod);
+            findDeclaredMethod(loader, targetMethod);
             if (interfaceMethodExact != null)
                 findMethod(loader, interfaceMethodExact);
             if (interfaceMethodVarargs != null)
