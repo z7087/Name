@@ -4,14 +4,17 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.objectweb.asm.Opcodes.*;
 
 public class ClassGenerator {
+    public static ZipOutputStream stream;
+
     private static final Class<?>[] classes = {
             boolean.class,
             byte.class,
@@ -171,22 +174,13 @@ public class ClassGenerator {
     }
 
     private static void writeToFile(String className, byte[] byteArray) {
-        String classesPath = "generatedclasses/";
-        String fullPath = classesPath + className;
-        int pathName_index_fileName = fullPath.lastIndexOf('/');
-        assertTrue(pathName_index_fileName > 0);
-        String pathName = fullPath.substring(0, pathName_index_fileName + 1);
-        FileOutputStream fos;
         try {
-            new File(pathName).mkdirs();
-            final File file = new File(fullPath + ".class");
-            file.createNewFile();
-            fos = new FileOutputStream(file);
-            fos.write(byteArray);
-            fos.close();
-        } catch (Exception e) {
-            System.out.print("FileOutputStream error " + e.getMessage());
-            e.printStackTrace();
+            stream.putNextEntry(new ZipEntry(className + ".class"));
+            stream.write(byteArray);
+            stream.closeEntry();
+        } catch (IOException e) {
+            e.printStackTrace(System.err);
+            throw new RuntimeException(e);
         }
     }
 
@@ -657,15 +651,19 @@ public class ClassGenerator {
             if (forTest)
                 generateTest();
         }
-        String[] base = null;
-        for (int i = 0; i <= mpc; ++i) {
-            generateBaseClass(i, base);
+        final boolean generateDeprecatedStuff = false;
+        //noinspection ConstantValue
+        if (generateDeprecatedStuff) {
+            String[] base = null;
+            for (int i = 0; i <= mpc; ++i) {
+                generateBaseClass(i, base);
+            }
+            for (int i = 0; i <= mpc; ++i) {
+                generateClass(i);
+            }
+            generateAll();
+            generateMethodAccessorCast();
         }
-        for (int i = 0; i <= mpc; ++i) {
-            generateClass(i);
-        }
-        generateAll();
-        generateMethodAccessorCast();
     }
 
     protected static ClassWriter writeClassHead(String className, String signature, String superName, String[] interfaces, int modifiers) {

@@ -3,6 +3,7 @@ plugins {
     id 'com.gradleup.shadow' version '8.3.0'
 }
 
+
 group = 'me.z7087.name'
 version = '1.0-SNAPSHOT'
 
@@ -16,16 +17,13 @@ repositories {
 dependencies {
     implementation 'org.ow2.asm:asm:9.7'
 
-    compileOnly project(":classgeneratorcompileonly")
-}
+    compileOnly project(":compileonly")
 
-tasks.create(name: "copyClasses", type: Copy) {
-    into 'build/classes/java/main/'
-    from 'generatedclasses/'
-}
+    def generateClasses = tasks.register("generateClasses", GenerateClasses) {
+    }
+    generateClasses.get().create()
 
-tasks.withType(JavaCompile) {
-    dependsOn(tasks.copyClasses)
+    implementation files(getProject().file("build/tmp/generated-classes.jar"))
 }
 
 shadowJar {
