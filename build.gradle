@@ -26,7 +26,12 @@ dependencies {
     implementation files(getProject().file("build/tmp/generated-classes.jar"))
 }
 
+build {
+    dependsOn(tasks.shadowJar)
+}
+
 shadowJar {
     minimize()
+    archiveFileName.set("${project.name}-${project.version}.jar")
     relocate("org.objectweb.asm", "me.z7087.name.libs.org.objectweb.asm")
 }
