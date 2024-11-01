@@ -3,7 +3,7 @@ package me.z7087.name;
 import java.util.Arrays;
 
 public final class MethodDesc {
-    private static final String[] EMPTY_STRING_ARRAY = new String[0];
+    static final String[] EMPTY_STRING_ARRAY = new String[0];
 
     private final String ownerClass;
     private final String ownerType;
@@ -32,6 +32,10 @@ public final class MethodDesc {
         return ownerClass;
     }
 
+    public String getOwnerType() {
+        return ownerType;
+    }
+
     public String getName() {
         return name;
     }
@@ -50,10 +54,6 @@ public final class MethodDesc {
 
     public String getMergedParamTypes() {
         return mergedParamTypes;
-    }
-
-    public String getOwnerType() {
-        return ownerType;
     }
 
     @Override
@@ -298,7 +298,7 @@ public final class MethodDesc {
 
     public static MethodDesc of(String ownerClass, String name, String returnType, String... paramTypes) {
         if (!checkClassDesc(ownerClass))
-            throw new IllegalArgumentException("OwnerClass descriptor check failed: " + ownerClass);
+            throw new IllegalArgumentException("OwnerClass name check failed: " + ownerClass);
         if (!checkMethodName(name))
             throw new IllegalArgumentException("Illegal method name: " + name);
         if (!checkTypeDesc(returnType))

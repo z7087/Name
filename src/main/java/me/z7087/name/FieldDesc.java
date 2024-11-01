@@ -82,11 +82,15 @@ public final class FieldDesc {
 
     public static FieldDesc of(String ownerClass, String name, String type) {
         if (!MethodDesc.checkClassDesc(ownerClass))
-            throw new IllegalArgumentException("OwnerClass descriptor check failed: " + ownerClass);
+            throw new IllegalArgumentException("OwnerClass name check failed: " + ownerClass);
         if (!checkFieldName(name))
             throw new IllegalArgumentException("Illegal field name: " + name);
         if ("V".equals(type) || !MethodDesc.checkTypeDesc(type))
             throw new IllegalArgumentException("Type descriptor check failed: " + type);
+        return new FieldDesc(ownerClass, name, type);
+    }
+
+    static FieldDesc ofNoCheck(String ownerClass, String name, String type) {
         return new FieldDesc(ownerClass, name, type);
     }
 }

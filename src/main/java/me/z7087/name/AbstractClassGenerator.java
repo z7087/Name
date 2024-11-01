@@ -462,6 +462,14 @@ abstract class AbstractClassGenerator {
         throw new NoSuchMethodException(sb);
     }
 
+    protected static void throwNoSuchMethodException(ConstructorDesc desc) throws NoSuchMethodException {
+        String sb = desc.getConstructorOwnerClass() +
+                ".<init> (" +
+                desc.getMergedParamTypes() +
+                ")V";
+        throw new NoSuchMethodException(sb);
+    }
+
     protected static void findField(ClassLoader loader, FieldDesc desc, boolean isStatic) throws NoSuchFieldException {
         try {
             for (java.lang.reflect.Field reflectField : Class.forName(desc.getOwnerClass().replace('/', '.'), false, loader).getFields()) {
@@ -501,6 +509,8 @@ abstract class AbstractClassGenerator {
                 ) {
                     notFound:
                     {
+                        if (reflectMethod.getParameterCount() != desc.getParamTypesRaw().length)
+                            break notFound;
                         final Class<?>[] reflectParamTypes = reflectMethod.getParameterTypes();
                         for (int i = 0, length = reflectParamTypes.length; i < length; ++i) {
                             if (!getClassDescName(reflectParamTypes[i]).equals(desc.getParamTypesRaw()[i])) {
@@ -525,6 +535,8 @@ abstract class AbstractClassGenerator {
                 ) {
                     notFound:
                     {
+                        if (reflectMethod.getParameterCount() != desc.getParamTypesRaw().length)
+                            break notFound;
                         final Class<?>[] reflectParamTypes = reflectMethod.getParameterTypes();
                         for (int i = 0, length = reflectParamTypes.length; i < length; ++i) {
                             if (!getClassDescName(reflectParamTypes[i]).equals(desc.getParamTypesRaw()[i])) {
@@ -533,6 +545,27 @@ abstract class AbstractClassGenerator {
                         }
                         return;
                     }
+                }
+            }
+        } catch (ClassNotFoundException ignored) {
+        }
+        throwNoSuchMethodException(desc);
+    }
+
+    protected static void findDeclaredConstructor(ClassLoader loader, ConstructorDesc desc) throws NoSuchMethodException {
+        try {
+            for (java.lang.reflect.Constructor<?> reflectConstructor : Class.forName(desc.getConstructorOwnerClass().replace('/', '.'), false, loader).getDeclaredConstructors()) {
+                notFound:
+                {
+                    if (reflectConstructor.getParameterCount() != desc.getParamTypesRaw().length)
+                        break notFound;
+                    final Class<?>[] reflectParamTypes = reflectConstructor.getParameterTypes();
+                    for (int i = 0, length = reflectParamTypes.length; i < length; ++i) {
+                        if (!getClassDescName(reflectParamTypes[i]).equals(desc.getParamTypesRaw()[i])) {
+                            break notFound;
+                        }
+                    }
+                    return;
                 }
             }
         } catch (ClassNotFoundException ignored) {
@@ -559,7 +592,14 @@ abstract class AbstractClassGenerator {
             } else {
                 // 2 objects and fromType != toType
                 // allow if one of them is java.lang.Object
-                return "Ljava/lang/Object;".equals(fromType) || "Ljava/lang/Object;".equals(toType);
+                if ("Ljava/lang/Object;".equals(fromType) || "Ljava/lang/Object;".equals(toType))
+                    return true;
+                // allow if both are not array
+                if (fromType.charAt(0) == 'L' && toType.charAt(0) == 'L')
+                    return true;
+                // allow if both are array
+                // or one is array and the other one is not java.lang.Object, disallow
+                return fromType.charAt(0) == '[' && toType.charAt(0) == '[';
             }
         }
     }
@@ -582,14 +622,8 @@ abstract class AbstractClassGenerator {
                 unboxingOnStack(mv, toType);
             } else {
                 // 2 objects and fromType != toType
-                //noinspection StatementWithEmptyBody
-                if ("Ljava/lang/Object;".equals(toType)) {
-                    // fall down
-                } else if ("Ljava/lang/Object;".equals(fromType)) {
+                if (!"Ljava/lang/Object;".equals(toType))
                     mv.visitTypeInsn(CHECKCAST, getClassName(toType));
-                } else {
-                    shouldNotReachHere();
-                }
             }
         }
     }

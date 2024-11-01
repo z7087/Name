@@ -71,7 +71,7 @@ public final class MethodFactory extends AbstractClassGenerator {
         }
         for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
             if (!canCheckCastOrBox(interfaceMethodExact.getParamTypesRaw()[i + offsetIndex], targetMethod.getParamTypesRaw()[i]))
-                throwIllegalArgumentException("The type of interfaceMethodExact parameter" + (i + offsetIndex) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethodExact.getParamTypesRaw()[i + offsetIndex] + "\n" + targetMethod.getParamTypesRaw()[i]);
+                throwIllegalArgumentException("The type of interfaceMethodExact parameter " + (i + offsetIndex) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethodExact.getParamTypesRaw()[i + offsetIndex] + "\n" + targetMethod.getParamTypesRaw()[i]);
         }
     }
 
@@ -110,7 +110,7 @@ public final class MethodFactory extends AbstractClassGenerator {
         }
         for (int i = 0, length = targetMethod.getParamTypesRaw().length; i < length; ++i) {
             if (!canCheckCastOrBox(typeOfArrayElement, targetMethod.getParamTypesRaw()[i]))
-                throwIllegalArgumentException("The type of interfaceMethodVarargs parameter" + (interfaceMethodVarargs.getParamTypesRaw().length - 1) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethodVarargs.getParamTypesRaw()[interfaceMethodVarargs.getParamTypesRaw().length - 1] + "\n" + targetMethod.getParamTypesRaw()[i]);
+                throwIllegalArgumentException("The type of interfaceMethodVarargs parameter " + (interfaceMethodVarargs.getParamTypesRaw().length - 1) + " is not compatible with the type of targetMethod parameter " + i + ": \n" + interfaceMethodVarargs.getParamTypesRaw()[interfaceMethodVarargs.getParamTypesRaw().length - 1] + "\n" + targetMethod.getParamTypesRaw()[i]);
         }
     }
 

@@ -1,9 +1,14 @@
 package me.z7087.name;
 
+import me.z7087.name.api.ConstructorAccessor;
 import me.z7087.name.api.FieldAccessor;
 import me.z7087.name.api.MethodAccessor;
 
 public class Example {
+    private Example() {
+        System.out.println("Example <init> running");
+    }
+    
     private static final int i = 0;
     private static final int[] ia = new int[1];
     private static void a() throws NoSuchFieldException, IllegalAccessException {
@@ -115,6 +120,37 @@ public class Example {
                 field.set(null, new int[3]); // instantly, but why?
                 System.out.println(ia.length); // 3
                 System.out.println(field.get(null).length); // 3
+            }
+        });
+        printTime("constructor accessor class 1", new Runnable() {
+            @Override
+            public void run() {
+                ConstructorAccessor<?> constructor = null;
+                try {
+                    constructor = ConstructorFactory.create(
+                            Example.class.getClassLoader(),
+                            Example.class.getDeclaredConstructor((Class<?>[]) null)
+                    );
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                }
+                constructor.newInstance("unused arg");
+            }
+        });
+        printTime("constructor accessor class 2", new Runnable() {
+            @Override
+            public void run() {
+                ConstructorAccessor<?> constructor = null;
+                try {
+                    constructor = ConstructorFactory.create(
+                            Example.class.getClassLoader(),
+                            Example.class,
+                            Object.class.getDeclaredConstructor((Class<?>[]) null)
+                    );
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                }
+                constructor.newInstance("unused arg");
             }
         });
     }
