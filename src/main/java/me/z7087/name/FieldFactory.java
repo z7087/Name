@@ -2,6 +2,7 @@ package me.z7087.name;
 
 import me.z7087.name.api.FieldAccessor;
 import me.z7087.name.generatedclasses.Here;
+import me.z7087.name.util.JavaVersion;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -143,10 +144,21 @@ public final class FieldFactory extends AbstractClassGenerator {
         final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
+        //// if static:
+        // unsafe.ensureClassInitialized(targetFieldClass.class);
+        //// if end
         // Field[] fl = targetFieldClass.class.privateGetDeclaredFields(false);
         // int arrayLength = fl.length;
         // int i = 0;
-        mv.visitLdcInsn(Type.getType(targetField.getOwnerType()));
+        {
+            final Type ownerType = Type.getType(targetField.getOwnerType());
+            if (isStatic) {
+                mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+                mv.visitLdcInsn(ownerType);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "ensureClassInitialized", "(Ljava/lang/Class;)V", false);
+            }
+            mv.visitLdcInsn(ownerType);
+        }
         mv.visitInsn(ICONST_0);
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "privateGetDeclaredFields", "(Z)[Ljava/lang/reflect/Field;", false);
         mv.visitVarInsn(ASTORE, 1);
@@ -482,8 +494,11 @@ public final class FieldFactory extends AbstractClassGenerator {
             writeMethodTail(mvSetter);
         }
         final byte[] classByteArray = writeClassTail(cw);
+        final ClassLoader newLoader = JavaVersion.getInstance().getVersion() <= 8
+                ? AccessorClassGenerator.getInstance().getGeneratedAccessorInstance().createAccessorClassLoaderJ8(loader)
+                : AccessorClassGenerator.getInstance().getGeneratedAccessorInstance().createAccessorClassLoaderJ9(null, loader);
         try {
-            final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, Here.class.getClassLoader(), null);
+            final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, newLoader, null);
             return interfaceClass.cast(outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null));
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);

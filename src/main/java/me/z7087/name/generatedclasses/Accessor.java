@@ -13,6 +13,7 @@ public interface Accessor {
     // lookup exists since jdk7
     // lookup with FULL_POWER_MODES if jdk9+ or ALL_MODES if jdk8-
     // throws exception if on jdk13- and className.startsWith("java.lang.invoke.")
+    // basically useless
     <T> T getLookupDefault();
     <T> T getLookupDefault(Class<?> clazz);
 
@@ -20,11 +21,11 @@ public interface Accessor {
     <T> T getLookupTrustedJ14();
     <T> T getLookupTrustedJ14(Class<?> clazz);
 
-    // jdk15 ~ jdk22
+    // jdk15 ~ jdk23+
     <T> T getLookupTrustedJ15();
     <T> T getLookupTrustedJ15(Class<?> clazz);
 
-    // jdk7 ~ jdk22
+    // jdk7 ~ jdk23+
     // Trusted access
     <T> T getImplLookup();
 
@@ -33,13 +34,19 @@ public interface Accessor {
     // jdk6- ~ jdk11
     Class<?> defineClassUnsafeJ8(String name, byte[] b, int off, int len, ClassLoader loader, ProtectionDomain protectionDomain);
 
-    // jdk9 ~ jdk22+
+    // jdk9 ~ jdk23+
     Class<?> defineClassUnsafeJ9(String name, byte[] b, int off, int len, ClassLoader loader, ProtectionDomain protectionDomain);
 
     // jdk7 ~ jdk16
     Class<?> defineAnonymousClass(Class<?> hostClass, byte[] data, Object[] cpPatches);
 
-    // jdk15 ~ jdk22+
+    // jdk15 ~ jdk23+
     // hostClass and the class going to define must have same package
     Class<?> defineHiddenClass(Class<?> hostClass, byte[] data);
+
+    // jdk6- ~ jdk8
+    ClassLoader createAccessorClassLoaderJ8(ClassLoader parent);
+
+    // jdk9 ~ jdk23+
+    ClassLoader createAccessorClassLoaderJ9(String name, ClassLoader parent);
 }

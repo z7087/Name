@@ -2,6 +2,7 @@ package me.z7087.name;
 
 import me.z7087.name.api.MethodAccessor;
 import me.z7087.name.generatedclasses.Here;
+import me.z7087.name.util.JavaVersion;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -380,8 +381,11 @@ public final class MethodFactory extends AbstractClassGenerator {
             writeMethodTail(mvInvokeVarargs);
         }
         final byte[] classByteArray = writeClassTail(cw);
+        final ClassLoader newLoader = JavaVersion.getInstance().getVersion() <= 8
+                ? AccessorClassGenerator.getInstance().getGeneratedAccessorInstance().createAccessorClassLoaderJ8(loader)
+                : AccessorClassGenerator.getInstance().getGeneratedAccessorInstance().createAccessorClassLoaderJ9(null, loader);
         try {
-            final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, Here.class.getClassLoader(), null);
+            final Class<?> outClass = UnsafeClassDefiner.define(className, classByteArray, newLoader, null);
             return interfaceClass.cast(outClass.getConstructor((Class<?>[]) null).newInstance((Object[]) null));
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);

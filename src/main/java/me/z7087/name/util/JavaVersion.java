@@ -28,6 +28,7 @@ public final class JavaVersion {
         map.put("20", (byte) 20);
         map.put("21", (byte) 21);
         map.put("22", (byte) 22);
+        map.put("23", (byte) 23);
         supportVersionsMap = Collections.unmodifiableMap(map);
     }
 

@@ -493,9 +493,29 @@ public class ClassGenerator {
             mv.visitInsn(ARETURN);
             writeMethodTail(mv);
         }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "createAccessorClassLoaderJ8", "(Ljava/lang/ClassLoader;)Ljava/lang/ClassLoader;");
+            mv.visitTypeInsn(NEW, path + "AccessorClassLoader");
+            mv.visitInsn(DUP);
+            mv.visitInsn(ACONST_NULL);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/ClassLoader", "<init>", "(Ljava/lang/Void;Ljava/lang/ClassLoader;)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "createAccessorClassLoaderJ9", "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/ClassLoader;");
+            mv.visitTypeInsn(NEW, path + "AccessorClassLoader");
+            mv.visitInsn(DUP);
+            mv.visitInsn(ACONST_NULL);
+            mv.visitVarInsn(ALOAD, 1);
+            mv.visitVarInsn(ALOAD, 2);
+            mv.visitMethodInsn(INVOKESPECIAL, "java/lang/ClassLoader", "<init>", "(Ljava/lang/Void;Ljava/lang/String;Ljava/lang/ClassLoader;)V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
         writeToFile(className, writeClassTail(cw));
     }
-
 
     private static void generateTest() {
         generateTest(7);
