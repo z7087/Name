@@ -38,11 +38,13 @@ public final class AccessorClassGenerator extends AbstractClassGenerator {
             final String className = path + "Door";
             final byte[] classByteArray;
             {
-                final ClassWriter cw;
+                final ClassWriter cw = new ClassWriter(0);
                 if (!isJ9) {
-                    cw = writeClassHead(className, null, "sun/reflect/MagicAccessorImpl", null);
+                    cw.visit(V1_6, ACC_PUBLIC, className, null, "sun/reflect/MagicAccessorImpl", null);
+                    writeConstructor(cw, "sun/reflect/MagicAccessorImpl");
                 } else {
-                    cw = writeClassHead(className, null, "jdk/internal/reflect/MagicAccessorImpl", null);
+                    cw.visit(V1_6, ACC_PUBLIC, className, null, "jdk/internal/reflect/MagicAccessorImpl", null);
+                    writeConstructor(cw, "jdk/internal/reflect/MagicAccessorImpl");
                 }
                 classByteArray = writeClassTail(cw);
             }
