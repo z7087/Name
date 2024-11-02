@@ -8,12 +8,16 @@ public class Example {
     private Example() {
         System.out.println("Example <init> running");
     }
-    
-    private static final int i = 0;
+
+    private static final int iInline = 0;
+    private static final int jNoInline;
+    static {
+        jNoInline = 0;
+    }
     private static final int[] ia = new int[1];
     private static void a() throws NoSuchFieldException, IllegalAccessException {
         System.out.println("YAY");
-        java.lang.reflect.Field f = Example.class.getDeclaredField("i");
+        java.lang.reflect.Field f = Example.class.getDeclaredField("jNoInline");
         f.setAccessible(true);
         if (f.getInt(null) == -114514)
             throw new NoSuchFieldException();
@@ -59,7 +63,7 @@ public class Example {
                 method.invoke(null, "unused arg");
             }
         });
-        printTime("field accessor class 1", new Runnable() {
+        printTime2("inline field accessor class", new Runnable() {
             @SuppressWarnings("unchecked")
             @Override
             public void run() {
@@ -67,20 +71,21 @@ public class Example {
                 try {
                     field = (FieldAccessor<Object, Integer>) FieldFactory.create(
                             Example.class.getClassLoader(),
-                            Example.class.getDeclaredField("i")
+                            Example.class.getDeclaredField("iInline")
                     );
                 } catch (NoSuchMethodException e) {
                     throw new RuntimeException(e);
                 } catch (NoSuchFieldException e) {
                     throw new RuntimeException(e);
                 }
-                System.out.println(field.get(null)); // 0
-                field.set(null, 1); // final fields cannot take effect instantly... but why?
-                System.out.println(i); // 0
-                System.out.println(field.get(null)); // 1
+                System.out.println(field.get(null)); // iInline
+                field.set(null, field.get(null) + 1);
+                // Example$3.class puts 0 here, not iInline, so this will never change
+                System.out.println(iInline); // 0
+                System.out.println(field.get(null)); // iInline + 1
             }
         });
-        printTime("field accessor class 2", new Runnable() {
+        printTime2("no inline field accessor class", new Runnable() {
             @SuppressWarnings("unchecked")
             @Override
             public void run() {
@@ -88,38 +93,17 @@ public class Example {
                 try {
                     field = (FieldAccessor<Object, Integer>) FieldFactory.create(
                             Example.class.getClassLoader(),
-                            Example.class.getDeclaredField("i")
+                            Example.class.getDeclaredField("jNoInline")
                     );
                 } catch (NoSuchMethodException e) {
                     throw new RuntimeException(e);
                 } catch (NoSuchFieldException e) {
                     throw new RuntimeException(e);
                 }
-                System.out.println(field.get(null)); // 1
-                field.set(null, 2);
-                System.out.println(i); // 0
-                System.out.println(field.get(null)); // 2
-            }
-        });
-        printTime("field accessor class 3", new Runnable() {
-            @SuppressWarnings("unchecked")
-            @Override
-            public void run() {
-                FieldAccessor<Object, int[]> field = null;
-                try {
-                    field = (FieldAccessor<Object, int[]>) FieldFactory.create(
-                            Example.class.getClassLoader(),
-                            Example.class.getDeclaredField("ia")
-                    );
-                } catch (NoSuchMethodException e) {
-                    throw new RuntimeException(e);
-                } catch (NoSuchFieldException e) {
-                    throw new RuntimeException(e);
-                }
-                System.out.println(ia.length); // 1
-                field.set(null, new int[3]); // instantly, but why?
-                System.out.println(ia.length); // 3
-                System.out.println(field.get(null).length); // 3
+                System.out.println(field.get(null)); // jNoInline
+                field.set(null, field.get(null) + 1);
+                System.out.println(jNoInline); // jNoInline + 1
+                System.out.println(field.get(null)); // jNoInline + 1
             }
         });
         printTime("constructor accessor class 1", new Runnable() {
