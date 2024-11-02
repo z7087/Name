@@ -6,7 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 public final class ReflectionUtil {
-    public static final Unsafe theUnsafe = getFieldValue(Unsafe.class, "theUnsafe", null);
+    public static final Unsafe theUnsafe = (Unsafe) getFieldValue(Unsafe.class, "theUnsafe", null);
 
     private static volatile Class<?> GeneratedClassForExtending;
 
@@ -16,8 +16,7 @@ public final class ReflectionUtil {
             m.setAccessible(true);
             return m;
         } catch (NoSuchMethodException e) {
-            e.printStackTrace();
-            return null;
+            throw new RuntimeException(e);
         }
     }
 
@@ -27,22 +26,20 @@ public final class ReflectionUtil {
             f.setAccessible(true);
             return f;
         } catch (NoSuchFieldException e) {
-            e.printStackTrace();
-            return null;
+            throw new RuntimeException(e);
         }
     }
 
-    private static <T> T getFieldValue(Class<?> clazz, String name, Object obj) {
+    private static Object getFieldValue(Class<?> clazz, String name, Object obj) {
         try {
             final Field f = clazz.getDeclaredField(name);
             f.setAccessible(true);
-            return (T) f.get(obj);
+            return f.get(obj);
         } catch (IllegalAccessException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         } catch (NoSuchFieldException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
-        return null;
     }
 
     private ReflectionUtil() {}
