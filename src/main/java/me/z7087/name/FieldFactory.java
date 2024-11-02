@@ -144,21 +144,11 @@ public final class FieldFactory extends AbstractClassGenerator {
         final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
-        //// if static:
-        // unsafe.ensureClassInitialized(targetFieldClass.class);
-        //// if end
         // Field[] fl = targetFieldClass.class.privateGetDeclaredFields(false);
         // int arrayLength = fl.length;
         // int i = 0;
-        {
-            final Type ownerType = Type.getType(targetField.getOwnerType());
-            if (isStatic) {
-                mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
-                mv.visitLdcInsn(ownerType);
-                mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "ensureClassInitialized", "(Ljava/lang/Class;)V", false);
-            }
-            mv.visitLdcInsn(ownerType);
-        }
+        final Type ownerType = Type.getType(targetField.getOwnerType());
+        mv.visitLdcInsn(ownerType);
         mv.visitInsn(ICONST_0);
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "privateGetDeclaredFields", "(Z)[Ljava/lang/reflect/Field;", false);
         mv.visitVarInsn(ASTORE, 1);
@@ -169,8 +159,16 @@ public final class FieldFactory extends AbstractClassGenerator {
         mv.visitVarInsn(ISTORE, 3);
         // for (; i < arrayLength; i++) {
         //     Field temp = fl[i];
-        //     if (temp.getName.equals("targetFieldName") && temp.getType.equals(targetFieldType.class)) {
+        //     if (temp.getName.equals("targetFieldName")
+        //             && temp.getType.equals(targetFieldType.class)
         //        // if static:
+        //             && (temp.getModifiers() & ACC_STATIC) != 0
+        //        // if end, else:
+        //             && (temp.getModifiers() & ACC_STATIC) == 0
+        //        // else end
+        //             ) {
+        //        // if static:
+        //         unsafe.ensureClassInitialized(targetFieldClass.class);
         //         this.offset = unsafe.staticFieldOffset(temp);
         //         this.base = unsafe.staticFieldBase(temp);
         //        // if end, else:
@@ -233,6 +231,16 @@ public final class FieldFactory extends AbstractClassGenerator {
         }
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "equals", "(Ljava/lang/Object;)Z", false);
         mv.visitJumpInsn(IFEQ, loopBackToStart);
+        mv.visitVarInsn(ALOAD, 4);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/reflect/Field", "getModifiers", "()I", false);
+        mv.visitIntInsn(BIPUSH, ACC_STATIC); // assert ACC_STATIC == 8
+        mv.visitInsn(IAND);
+        mv.visitJumpInsn(isStatic ? IFEQ : IFNE, loopBackToStart);
+        if (isStatic) {
+            mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+            mv.visitLdcInsn(ownerType);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "sun/misc/Unsafe", "ensureClassInitialized", "(Ljava/lang/Class;)V", false);
+        }
         mv.visitVarInsn(ALOAD, 0);
         mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
         mv.visitVarInsn(ALOAD, 4);

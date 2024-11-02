@@ -354,6 +354,35 @@ public class ClassGenerator {
             writeMethodTail(mv);
         }
         {
+            final MethodVisitor mv = writeMethodHead(cw, "getUnsafe", "()Ljava/lang/Object;");
+            mv.visitFieldInsn(GETSTATIC, "sun/misc/Unsafe", "theUnsafe", "Lsun/misc/Unsafe;");
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "createUnsafe", "()Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "sun/misc/Unsafe");
+            mv.visitInsn(DUP);
+            mv.visitMethodInsn(INVOKESPECIAL, "sun/misc/Unsafe", "<init>", "()V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "getUnsafeJ9", "()Ljava/lang/Object;");
+            mv.visitFieldInsn(GETSTATIC, "jdk/internal/misc/Unsafe", "theUnsafe", "Ljdk/internal/misc/Unsafe;");
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        {
+            final MethodVisitor mv = writeMethodHead(cw, "createUnsafeJ9", "()Ljava/lang/Object;");
+            mv.visitTypeInsn(NEW, "jdk/internal/misc/Unsafe");
+            mv.visitInsn(DUP);
+            mv.visitMethodInsn(INVOKESPECIAL, "jdk/internal/misc/Unsafe", "<init>", "()V", false);
+            mv.visitInsn(ARETURN);
+            writeMethodTail(mv);
+        }
+        /*
+        {
             final MethodVisitor mv = writeMethodHead(cw, "getLookupDefault", "()Ljava/lang/Object;");
             mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");
             mv.visitInsn(DUP);
@@ -372,6 +401,7 @@ public class ClassGenerator {
             mv.visitInsn(ARETURN);
             writeMethodTail(mv);
         }
+        */
         {
             final MethodVisitor mv = writeMethodHead(cw, "getLookupTrustedJ14", "()Ljava/lang/Object;");
             mv.visitTypeInsn(NEW, "java/lang/invoke/MethodHandles$Lookup");

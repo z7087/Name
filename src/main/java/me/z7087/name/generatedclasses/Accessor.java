@@ -3,19 +3,23 @@ package me.z7087.name.generatedclasses;
 import java.security.ProtectionDomain;
 
 public interface Accessor {
+    // jdk6- ~ jdk23+
     ClassLoader getClassLoader(Class<?> clazz);
 
+    // jdk6- ~ jdk23+
     ClassLoader getProtectionDomain(Class<?> clazz);
 
+    // jdk6- ~ jdk23+
     // same as getProtectionDomain, but may return null
     ClassLoader getProtectionDomainOrNull(Class<?> clazz);
 
-    // lookup exists since jdk7
-    // lookup with FULL_POWER_MODES if jdk9+ or ALL_MODES if jdk8-
-    // throws exception if on jdk13- and className.startsWith("java.lang.invoke.")
-    // basically useless
-    <T> T getLookupDefault();
-    <T> T getLookupDefault(Class<?> clazz);
+    // jdk6- ~ jdk23+
+    <T> T getUnsafe();
+    <T> T createUnsafe();
+
+    // jdk9 ~ jdk23+
+    <T> T getUnsafeJ9();
+    <T> T createUnsafeJ9();
 
     // jdk7 ~ jdk14
     <T> T getLookupTrustedJ14();
@@ -29,6 +33,7 @@ public interface Accessor {
     // Trusted access
     <T> T getImplLookup();
 
+    // jdk6- ~ jdk23+
     Class<?> defineClass(String name, byte[] b, int off, int len, ClassLoader loader, ProtectionDomain protectionDomain) throws ClassFormatError;
 
     // jdk6- ~ jdk11
