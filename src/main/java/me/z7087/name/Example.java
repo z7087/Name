@@ -137,5 +137,36 @@ public class Example {
                 constructor.newInstance("unused arg");
             }
         });
+        printTime("System.security field accessor class", new Runnable() {
+            @SuppressWarnings("unchecked")
+            @Override
+            public void run() {
+                FieldAccessor<Object, SecurityManager> field = null;
+                try {
+                    field = (FieldAccessor<Object, SecurityManager>) FieldFactory.create(
+                            Example.class.getClassLoader(),
+                            FieldAccessor.class,
+                            FieldDesc.of("java/lang/System", "security", "Ljava/lang/SecurityManager;"),
+                            MethodDesc.of(FieldAccessor.class, "get", Object.class, Object.class),
+                            MethodDesc.of(FieldAccessor.class, "set", void.class, Object.class, Object.class),
+                            true,
+                            false,
+                            false
+                    );
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                } catch (NoSuchFieldException e) {
+                    throw new RuntimeException(e);
+                }
+                SecurityManager old = field.get(null);
+                if (old == null)
+                    System.setSecurityManager(new SecurityManager());
+                System.out.println(field.get(null));
+                field.set(null, null);
+                System.out.println(field.get(null));
+                if (old != null)
+                    field.set(null, old);
+            }
+        });
     }
 }

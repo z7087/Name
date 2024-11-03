@@ -144,41 +144,50 @@ public final class FieldFactory extends AbstractClassGenerator {
         final MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESPECIAL, superName, "<init>", "()V", false);
+        // didNotCheckOrigin = true;
+        mv.visitInsn(ICONST_1);
+        mv.visitVarInsn(ISTORE, 5);
         // Field[] fl = targetFieldClass.class.privateGetDeclaredFields(false);
-        // int arrayLength = fl.length;
-        // int i = 0;
         final Type ownerType = Type.getType(targetField.getOwnerType());
         mv.visitLdcInsn(ownerType);
         mv.visitInsn(ICONST_0);
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "privateGetDeclaredFields", "(Z)[Ljava/lang/reflect/Field;", false);
         mv.visitVarInsn(ASTORE, 1);
+        // do {
+        //     int arrayLength = fl.length;
+        //     int i = 0;
+        //     for (; i < arrayLength; i++) {
+        //         Field temp = fl[i];
+        //         if (temp.getName.equals("targetFieldName")
+        //                 && temp.getType.equals(targetFieldType.class)
+        //            // if static:
+        //                 && (temp.getModifiers() & ACC_STATIC) != 0
+        //            // if end, else:
+        //                 && (temp.getModifiers() & ACC_STATIC) == 0
+        //            // else end
+        //                 ) {
+        //            // if static:
+        //             unsafe.ensureClassInitialized(targetFieldClass.class);
+        //             this.offset = unsafe.staticFieldOffset(temp);
+        //             this.base = unsafe.staticFieldBase(temp);
+        //            // if end, else:
+        //             this.offset = unsafe.objectFieldOffset(temp);
+        //             this.base = null;
+        //            // else end
+        //             return;
+        //         }
+        //     }
+        //     fl = targetFieldClass.class.getDeclaredFields0(false);
+        // } while (didNotCheckOrigin);
+        // throw new IllegalArgumentException(new NoSuchFieldException("targetFieldClassName.targetFieldName targetFieldType"));
+        Label doWhileLoopStart = new Label();
+        Label doWhileLoopEnd = new Label();
+        mv.visitLabel(doWhileLoopStart);
         mv.visitVarInsn(ALOAD, 1);
         mv.visitInsn(ARRAYLENGTH);
         mv.visitVarInsn(ISTORE, 2);
         mv.visitInsn(ICONST_0);
         mv.visitVarInsn(ISTORE, 3);
-        // for (; i < arrayLength; i++) {
-        //     Field temp = fl[i];
-        //     if (temp.getName.equals("targetFieldName")
-        //             && temp.getType.equals(targetFieldType.class)
-        //        // if static:
-        //             && (temp.getModifiers() & ACC_STATIC) != 0
-        //        // if end, else:
-        //             && (temp.getModifiers() & ACC_STATIC) == 0
-        //        // else end
-        //             ) {
-        //        // if static:
-        //         unsafe.ensureClassInitialized(targetFieldClass.class);
-        //         this.offset = unsafe.staticFieldOffset(temp);
-        //         this.base = unsafe.staticFieldBase(temp);
-        //        // if end, else:
-        //         this.offset = unsafe.objectFieldOffset(temp);
-        //         this.base = null;
-        //        // else end
-        //         return;
-        //     }
-        // }
-        // throw new IllegalArgumentException(new NoSuchFieldException("targetFieldClassName.targetFieldName targetFieldType"));
         Label loopStart = new Label();
         Label loopEnd = new Label();
         Label loopBackToStart = new Label();
@@ -264,6 +273,16 @@ public final class FieldFactory extends AbstractClassGenerator {
         mv.visitIincInsn(3, 1);
         mv.visitJumpInsn(GOTO, loopStart);
         mv.visitLabel(loopEnd);
+        mv.visitVarInsn(ILOAD, 5);
+        mv.visitJumpInsn(IFEQ, doWhileLoopEnd);
+        mv.visitInsn(ICONST_0);
+        mv.visitVarInsn(ISTORE, 5);
+        mv.visitLdcInsn(ownerType);
+        mv.visitInsn(ICONST_0);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getDeclaredFields0", "(Z)[Ljava/lang/reflect/Field;", false);
+        mv.visitVarInsn(ASTORE, 1);
+        mv.visitJumpInsn(GOTO, doWhileLoopStart);
+        mv.visitLabel(doWhileLoopEnd);
         mv.visitTypeInsn(NEW, "java/lang/IllegalArgumentException");
         mv.visitInsn(DUP);
         mv.visitTypeInsn(NEW, "java/lang/NoSuchFieldException");
