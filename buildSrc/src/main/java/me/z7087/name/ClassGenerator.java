@@ -645,7 +645,6 @@ public class ClassGenerator {
         }
         // and you can merge them
         // create a class and name it "/", cls.getName() returns "."
-        // super fun :D
         if ((f & 4) != 0) {
             {
                 final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
