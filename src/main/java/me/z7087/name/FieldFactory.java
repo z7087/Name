@@ -153,7 +153,7 @@ public final class FieldFactory extends AbstractClassGenerator {
         mv.visitInsn(ICONST_0);
         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "privateGetDeclaredFields", "(Z)[Ljava/lang/reflect/Field;", false);
         mv.visitVarInsn(ASTORE, 1);
-        // do {
+        // while (true) {
         //     int arrayLength = fl.length;
         //     int i = 0;
         //     for (; i < arrayLength; i++) {
@@ -177,8 +177,11 @@ public final class FieldFactory extends AbstractClassGenerator {
         //             return;
         //         }
         //     }
+        //     if (!didNotCheckOrigin)
+        //         break;
+        //     didNotCheckOrigin = false;
         //     fl = targetFieldClass.class.getDeclaredFields0(false);
-        // } while (didNotCheckOrigin);
+        // }
         // throw new IllegalArgumentException(new NoSuchFieldException("targetFieldClassName.targetFieldName targetFieldType"));
         Label doWhileLoopStart = new Label();
         Label doWhileLoopEnd = new Label();
