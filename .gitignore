@@ -2,6 +2,7 @@
 build/
 classgenerator/build/
 classgeneratorcompileonly/build/
+generated-classes/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/

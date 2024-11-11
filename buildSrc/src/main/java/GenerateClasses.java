@@ -13,7 +13,7 @@ public abstract class GenerateClasses extends DefaultTask {
     @TaskAction
     public void create() throws IOException {
         try {
-            File f = getProject().file("build/tmp/generated-classes.jar");
+            File f = getProject().file("generated-classes/generated-classes.jar");
             f.getParentFile().mkdirs();
             OutputStream output = new FileOutputStream(f);
             ClassGenerator.stream = new JarOutputStream(output);
