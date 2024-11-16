@@ -61,11 +61,3 @@ publishing {
         }
     }
 }
-
-publishNormalPublicationToMavenLocal {
-    dependsOn(tasks.shadowNormalJar)
-}
-
-publishFatJarPublicationToMavenLocal {
-    dependsOn(tasks.shadowJar)
-}
