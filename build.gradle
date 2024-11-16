@@ -1,5 +1,3 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-
 buildscript {
     def generateClasses = tasks.register("generateClasses", GenerateClasses) {
     }
@@ -8,7 +6,6 @@ buildscript {
 
 plugins {
     id 'java-library'
-    id 'maven-publish'
     id 'com.gradleup.shadow' version '8.3.0'
 }
 
@@ -31,33 +28,12 @@ dependencies {
     implementation files(getProject().file("generated-classes/generated-classes.jar"))
 }
 
-tasks.register("shadowNormalJar", ShadowJar) {
-    minimize()
-    archiveFileName.set("${project.name}-${project.version}.jar")
-    dependencies {
-        exclude(dependency('org.ow2.asm:asm:9.7'))
-    }
+build {
+    dependsOn(tasks.shadowJar)
 }
 
 shadowJar {
     minimize()
-    archiveFileName.set("${project.name}-${project.version}-all.jar")
+    archiveFileName.set("${project.name}-${project.version}.jar")
     relocate("org.objectweb.asm", "me.z7087.name.libs.org.objectweb.asm")
-}
-
-build {
-    dependsOn(tasks.shadowNormalJar)
-    dependsOn(tasks.shadowJar)
-}
-
-publishing {
-    publications {
-        normal(MavenPublication) {
-            artifact shadowNormalJar
-        }
-        fatJar(MavenPublication) {
-            artifactId 'Name-fatjar'
-            artifact shadowJar
-        }
-    }
 }
