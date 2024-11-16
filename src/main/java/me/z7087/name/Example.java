@@ -160,7 +160,7 @@ public class Example {
                 }
                 SecurityManager old = field.get(null);
                 if (old == null)
-                    System.setSecurityManager(new SecurityManager());
+                    field.set(null, new SecurityManager());
                 System.out.println(field.get(null));
                 field.set(null, null);
                 System.out.println(field.get(null));
