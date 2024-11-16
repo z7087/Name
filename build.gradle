@@ -32,6 +32,7 @@ dependencies {
 }
 
 tasks.register("shadowNormalJar", ShadowJar) {
+    dependsOn(jar)
     minimize()
     archiveFileName.set("${project.name}-${project.version}.jar")
     dependencies {
@@ -40,6 +41,7 @@ tasks.register("shadowNormalJar", ShadowJar) {
 }
 
 shadowJar {
+    dependsOn(jar)
     minimize()
     archiveFileName.set("${project.name}-${project.version}-all.jar")
     relocate("org.objectweb.asm", "me.z7087.name.libs.org.objectweb.asm")
