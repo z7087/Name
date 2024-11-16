@@ -53,21 +53,19 @@ build {
 publishing {
     publications {
         normal(MavenPublication) {
-            artifact tasks.shadowNormalJar
+            artifact shadowNormalJar
         }
         fatJar(MavenPublication) {
             artifactId 'Name-fatjar'
-            artifact tasks.shadowJar
+            artifact shadowJar
         }
     }
 }
 
 publishNormalPublicationToMavenLocal {
-    mustRunAfter(tasks.jar)
     dependsOn(tasks.shadowNormalJar)
 }
 
 publishFatJarPublicationToMavenLocal {
-    mustRunAfter(tasks.jar)
     dependsOn(tasks.shadowJar)
 }
